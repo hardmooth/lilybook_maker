@@ -9,6 +9,9 @@ It is mainly developed to run on Windows, but should
 
 * clone this repository (e.g. as submodule of your book files)
 * install LaTeX and Lilypond
+* you can run a check whether the lilybook_maker finds everything:
+
+    python setup.py --check
 
 ## creating a PDF
 

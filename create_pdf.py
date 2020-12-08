@@ -40,16 +40,28 @@ CMD_LILYPOND  = u'"{py}" "{lp}"'.format( py = os.path.join( PATH_LILYPOND, u"pyt
 CMD_PDFLATEX  = u"pdflatex"
 
 LOG_FILE = os.path.join( os.getcwd(), os.path.basename( __file__).rstrip("pyco") + "log")
-def loggingSetup():
-    # create file handler which logs even debug messages
-    if os.path.exists(LOG_FILE):
-        os.remove(LOG_FILE)
+def loggingSetup( log_file, print_to_stdout = False):
+    # reset log file if already existed
+    if os.path.exists(log_file):
+        os.remove(log_file)
+
+    handlers = []
+
+    # log to file
+    file_handler = logging.FileHandler( filename= log_file)
+    file_handler.setLevel( logging.DEBUG)
+    handlers.append( file_handler)
+
+    # 
+    if print_to_stdout:
+        stdout_handler = logging.StreamHandler(sys.stdout)
+        stdout_handler.setLevel( logging.WARNING)
+        handlers.append( stdout_handler)
 
     logging.basicConfig(
         format = '%(asctime)s [%(levelname)s] %(message)s',
         datefmt = '%Y-%m-%d %H:%M:%S',
-        filename = LOG_FILE,
-        level=logging.DEBUG
+        handlers = handlers,
     )
 
 def RunCMD(cmd, raise_on_error = True, write_to_log = True, decode_std = True, env = None, path_pre = None):
@@ -268,7 +280,7 @@ def RunMain( options = None,
     CheckLogForErrors()
     
 if __name__ == '__main__':
-    loggingSetup()
+    loggingSetup( LOG_FILE)
     logging.info("Working in %s", os.getcwd())
     try:
         os.environ["path"] = "{0};{1}".format( os.environ["path"], PATH_LILYPOND)
