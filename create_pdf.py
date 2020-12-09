@@ -121,6 +121,10 @@ def RunCMD(cmd, raise_on_error = True, write_to_log = True, decode_std = True, e
     
     return stdout, stderr
 
+def _AddLilypondToPath():
+    os.environ["path"] = "{0};{1}".format( os.environ["path"], PATH_LILYPOND)
+    os.environ["PATH"] = "{0};{1}".format( os.environ["PATH"], PATH_LILYPOND)
+
 PREREQUISITES = [
     { "cmd": "{0} --help -v".format( CMD_LILYPOND),
       "env": dict( os.environ, 
@@ -283,8 +287,7 @@ if __name__ == '__main__':
     loggingSetup( LOG_FILE)
     logging.info("Working in %s", os.getcwd())
     try:
-        os.environ["path"] = "{0};{1}".format( os.environ["path"], PATH_LILYPOND)
-        os.environ["PATH"] = "{0};{1}".format( os.environ["PATH"], PATH_LILYPOND)
+        _AddLilypondToPath()
         _CheckPrerequisites()
         RunMain()
     except Exception as exc:

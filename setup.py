@@ -15,7 +15,7 @@ from optparse import OptionParser
 # -- pip ---
 
 # -- local imports ---
-from create_pdf import _CheckPrerequisites, loggingSetup
+from create_pdf import _CheckPrerequisites, _AddLilypondToPath, loggingSetup
 
 LOG_FILE = "setup.log"
 
@@ -66,4 +66,5 @@ def RunMain( options = None,
 
 if __name__ == "__main__":
     loggingSetup( LOG_FILE, print_to_stdout = True)
+    _AddLilypondToPath()
     RunMain()
