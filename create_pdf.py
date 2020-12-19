@@ -63,6 +63,16 @@ def loggingSetup( log_file, print_to_stdout = True):
         stdout_handler.setFormatter( formatter)
         _logger.addHandler( stdout_handler)
 
+def sizeof_fmt(num, suffix='B'):
+    """
+    @see: https://stackoverflow.com/a/1094933/1498405
+    """
+    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+        if abs(num) < 1024.0:
+            return "%3.1f%s%s" % (num, unit, suffix)
+        num /= 1024.0
+    return "%.1f%s%s" % (num, 'Yi', suffix)
+
 def RunCMD(cmd, raise_on_error = True, write_to_log = True, decode_std = True, env = None, path_pre = None):
     def _ToStr( str_or_b):
         _as_str = str_or_b.decode(locale.getpreferredencoding()) if not isinstance( str_or_b, str) else str_or_b
@@ -80,7 +90,7 @@ def RunCMD(cmd, raise_on_error = True, write_to_log = True, decode_std = True, e
         _path = "{0}:{1}".format( path_pre if isinstance( path_pre, str) else ";".join(path_pre), os.environ["path"])
         _env["path"] = _path
         _env["PATH"] = _path
-        logging.debug("ENV:{0}".format( pprint.pformat( _env)))
+        ##logging.debug("ENV:{0}".format( pprint.pformat( _env)))
     else:
         _env = None
          
@@ -159,7 +169,7 @@ def _CheckPrerequisites():
     if any_failed:
         sys.exit(EXIT_BAD_PREREQUISITES)
 
-INCLUDE_DEFAULTS = ["inc", "scores", "."]
+INCLUDE_DEFAULTS = ["inc", "scores", os.getcwd()]
 def ParseOptions( options = None, args = None, **kwargs):
     parser = OptionParser()
     parser.add_option("-L", "--lytex",      dest="lytex_file",     help="Input file name")
@@ -228,18 +238,29 @@ def Ly2Tex(options,args):
         raise
     _tex_file = os.path.join( options.output_dir, options.tex_file)
     assert os.path.exists( _tex_file), "TeX-File '{0}' not generated.".format( _tex_file)
+    
+    with open(_tex_file) as fh:
+        line_count = len(fh.readlines())
+    
+    logging.info( "Written %s lines to %s", line_count, _tex_file)
 
 def Tex2PDF(options, args):
+    logging.info("tex2pdf %s", options.tex_file)
     last_dir = os.getcwd()
     os.chdir( options.output_dir)
     
-    cmd = CMD_PDFLATEX + " --interaction=nonstopmode {0}".format(options.tex_file)
+    cmd = [ CMD_PDFLATEX,
+            "-interaction=nonstopmode",
+          ] + [f"-include-directory={_dir}" for _dir in options.include_dirs
+          ] + [ options.tex_file]
     RunCMD( cmd, write_to_log = True)
     
     shutil.copyfile( options.pdf_file,
                      os.path.join( last_dir,           options.pdf_file))
     
     os.chdir( last_dir)
+    _size = sizeof_fmt( os.stat( options.pdf_file).st_size)
+    logging.info("Written %s to %s", _size, options.pdf_file)
 
 ERROR_REGEX = [
     re.compile( r"output"  , re.IGNORECASE),
@@ -247,7 +268,7 @@ ERROR_REGEX = [
     re.compile( r"error"   , re.IGNORECASE),
     re.compile( r"critical", re.IGNORECASE),
 ]
-def CheckLogForErrors():
+def CheckLogForErrors( print_to_stdout = False):
     grepped_lines = []
     with open(LOG_FILE, "r") as log_fh:
         for i, line in enumerate( log_fh):
@@ -259,9 +280,10 @@ def CheckLogForErrors():
                                                                     "\n".join( "[{0:4}] {1}".format( i, line) 
                                                                                for i, line in grepped_lines))
         logging.info( msg)
-        print("-" * 60)
-        print(msg)
-        print("-" * 60)
+        if print_to_stdout:
+            print("-" * 60)
+            print(msg)
+            print("-" * 60)
 
 def RunMain( options = None,
              args    = None,
