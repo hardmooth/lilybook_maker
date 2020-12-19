@@ -39,30 +39,29 @@ CMD_LILYPOND  = u'"{py}" "{lp}"'.format( py = os.path.join( PATH_LILYPOND, u"pyt
                                          lp = os.path.join( PATH_LILYPOND, u"lilypond-book.py"))
 CMD_PDFLATEX  = u"pdflatex"
 
+#: log file to write to (create_pdf.log in the current working directory)
 LOG_FILE = os.path.join( os.getcwd(), os.path.basename( __file__).rstrip("pyco") + "log")
-def loggingSetup( log_file, print_to_stdout = False):
+_logger = logging.getLogger()
+def loggingSetup( log_file, print_to_stdout = True):
     # reset log file if already existed
     if os.path.exists(log_file):
         os.remove(log_file)
 
-    handlers = []
+    formatter = logging.Formatter( '%(asctime)s [%(levelname)s] %(message)s')
+    _logger.setLevel( logging.DEBUG)
 
     # log to file
     file_handler = logging.FileHandler( filename= log_file)
     file_handler.setLevel( logging.DEBUG)
-    handlers.append( file_handler)
+    file_handler.setFormatter( formatter)
+    _logger.addHandler( file_handler)
 
     # 
     if print_to_stdout:
         stdout_handler = logging.StreamHandler(sys.stdout)
-        stdout_handler.setLevel( logging.WARNING)
-        handlers.append( stdout_handler)
-
-    logging.basicConfig(
-        format = '%(asctime)s [%(levelname)s] %(message)s',
-        datefmt = '%Y-%m-%d %H:%M:%S',
-        handlers = handlers,
-    )
+        stdout_handler.setLevel( logging.INFO)
+        stdout_handler.setFormatter( formatter)
+        _logger.addHandler( stdout_handler)
 
 def RunCMD(cmd, raise_on_error = True, write_to_log = True, decode_std = True, env = None, path_pre = None):
     def _ToStr( str_or_b):
@@ -160,7 +159,7 @@ def _CheckPrerequisites():
     if any_failed:
         sys.exit(EXIT_BAD_PREREQUISITES)
 
-INCLUDE_DEFAULTS = ["inc", "scores"]
+INCLUDE_DEFAULTS = ["inc", "scores", "."]
 def ParseOptions( options = None, args = None, **kwargs):
     parser = OptionParser()
     parser.add_option("-L", "--lytex",      dest="lytex_file",     help="Input file name")
