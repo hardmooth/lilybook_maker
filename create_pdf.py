@@ -8,6 +8,9 @@ usage::
         python lilybook_maker/create_pdf.py 
     2. during run accept MikTeX-updates/installers
 
+@todo: run from external directory, e.g. d:/work/lilybook_maker/ and list logging info correctly
+@todo: let setup.py crate "build.cmd"
+
 @attention: funktioniert nicht aus LiClipse/Eclipse heraus, da lilypond-book via python 2.4 ausgeführt wird.
             Besser aus CMD ausführen::
                 python create_pdf.py
@@ -212,6 +215,9 @@ def ParseOptions( options = None, args = None, **kwargs):
         options.include_dirs = options.include_dirs.split(",")
     if not options.include_dirs:
         options.include_dirs = INCLUDE_DEFAULTS
+    
+    # transform relative paths to absolute - we'll have to jump around a bit.
+    options.include_dirs = [ p if os.path.isabs( p) else os.path.abspath( p) for p in options.include_dirs]
     
     main_file, _ = os.path.splitext( options.lytex_file)
     options.tex_file = main_file + ".tex"
