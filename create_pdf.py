@@ -21,6 +21,7 @@ usage::
 @copyright: Copyright (c) 2018 Hartmut Leister
 """
 
+# -- python standard --
 import glob
 import locale
 import logging
@@ -33,14 +34,17 @@ import traceback
 
 from optparse import OptionParser
 
-EXIT_BAD_PARAMETERS    = 1
-EXIT_BAD_PREREQUISITES = 2
-EXIT_CRITICAL          = 4 
+# -- pip --
 
-PATH_LILYPOND = r"c:\Program Files (x86)\LilyPond\usr\bin"
+# -- local imports --
+from base import RunCMD, EXIT_BAD_PARAMETERS, EXIT_BAD_PREREQUISITES, EXIT_CRITICAL, GetConfig
+
+# ------------------------------------------------------------------------------------------------
+
+PATH_LILYPOND = GetConfig()["lilypond"]["PATH_LILYPOND"]
 CMD_LILYPOND  = u'"{py}" "{lp}"'.format( py = os.path.join( PATH_LILYPOND, u"python.exe"),
                                          lp = os.path.join( PATH_LILYPOND, u"lilypond-book.py"))
-CMD_PDFLATEX  = u"pdflatex"
+CMD_PDFLATEX  = GetConfig()["latex"]["CMD_PDFLATEX"]
 
 #: log file to write to (create_pdf.log in the current working directory)
 LOG_FILE = os.path.join( os.getcwd(), os.path.basename( __file__).rstrip("pyco") + "log")
@@ -75,63 +79,6 @@ def sizeof_fmt(num, suffix='B'):
             return "%3.1f%s%s" % (num, unit, suffix)
         num /= 1024.0
     return "%.1f%s%s" % (num, 'Yi', suffix)
-
-def RunCMD(cmd, raise_on_error = True, write_to_log = True, decode_std = True, env = None, path_pre = None):
-    def _ToStr( str_or_b):
-        _as_str = str_or_b.decode(locale.getpreferredencoding()) if not isinstance( str_or_b, str) else str_or_b
-        _as_str = _as_str.replace("\r\n", "\n")
-        return _as_str
-    
-    if write_to_log:
-        logging.info ( "CMD: {0}".format( cmd))
-
-    if isinstance(cmd, list):
-        cmd = " ".join(cmd)
-        
-    if path_pre:
-        _env  = env if env else os.environ
-        _path = "{0}:{1}".format( path_pre if isinstance( path_pre, str) else ";".join(path_pre), os.environ["path"])
-        _env["path"] = _path
-        _env["PATH"] = _path
-        ##logging.debug("ENV:{0}".format( pprint.pformat( _env)))
-    else:
-        _env = None
-         
-    try:
-        p = subprocess.Popen( cmd,
-                              stdout = subprocess.PIPE,
-                              stderr = subprocess.PIPE,
-                              env    = _env)
-        stdout, stderr = p.communicate()
-        ret_code = p.returncode
-    except Exception as exc:
-        logging.critical( "CMD FAILED with exception:")
-        logging.critical( "CMD: {0}".format( cmd))
-        logging.critical( "EXC: {0}".format( repr(exc)))
-        logging.exception( "exception:")
-        sys.exit(EXIT_CRITICAL)
-    
-    if write_to_log:
-        logging.debug( "OUT: {0}".format( _ToStr( stdout)))
-        logging.debug( "ERR: {0}".format( _ToStr( stderr)))
-    
-    if ret_code and stderr and raise_on_error:
-        _msg = ("CMD FAILED: {0}\n"
-                "-- STDOUT --\n"
-                "{1}\n"
-                "-- STDERR -- \n"
-                "{2}\n"
-                "------------"
-               ).format( cmd, 
-                         stdout.rstrip().decode(locale.getpreferredencoding(), errors = "replace"), 
-                         stderr.rstrip().decode(locale.getpreferredencoding(), errors = "replace"))
-        raise RuntimeError("CMD failed: '{0}'".format(_msg))
-    
-    if decode_std:
-        stdout = stdout.rstrip().decode(locale.getpreferredencoding(), errors = "replace") 
-        stderr = stderr.rstrip().decode(locale.getpreferredencoding(), errors = "replace")
-    
-    return stdout, stderr
 
 def _AddLilypondToPath():
     os.environ["path"] = "{0};{1}".format( os.environ["path"], PATH_LILYPOND)

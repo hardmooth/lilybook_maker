@@ -26,6 +26,9 @@ It is developed in bundle with https://github.com/hardmooth/lilybook_template - 
            git config --global credential.helper cache
 
   1. git clone https://github.com/hardmooth/lilybook_maker.git (I suggest to clone it once and add
+  1. create initial configuration:
+  
+      python setup.py --init
 
 * you can run a check whether the lilybook_maker finds everything (CMD inside the lilybook_maker):
 
