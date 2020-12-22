@@ -12,7 +12,8 @@
 
 
 :: simply run the python PDF builder (it will detect your LyTeX-File and build the book)
-python %~dp0\create_pdf.py
+:: forward all parameters given to this CMD to the python PDF builder: %*
+python %~dp0\create_pdf.py %*
 
 :: uncomment the following line to keep CMD open
 pause

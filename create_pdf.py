@@ -11,8 +11,12 @@ usage::
 @todo: run from external directory, e.g. d:/work/lilybook_maker/ and list logging info correctly
 @todo: let setup.py crate "build.cmd"
 
-@attention: funktioniert nicht aus LiClipse/Eclipse heraus, da lilypond-book via python 2.4 ausgeführt wird.
-            Besser aus CMD ausführen::
+@note: if lilypond fails with "Pango-ERROR **: Unable to open font file ...", 
+    one workaround could be to set the followiging environment variable::
+        set FC_DEBUG=8191
+
+@attention: doesn't work from within LiClipse/Eclipse, since lilypond-book is executes via python 2.4 (this here is python 3.*).
+            But you can use VS Code or run from CMD::
                 python create_pdf.py
 
 @requires: python 3.6 or higher
@@ -95,12 +99,16 @@ PREREQUISITES = [
     { "cmd": "lilypond --help",
       "help": "add '{0}' to %PATH%".format( PATH_LILYPOND)},
 ]
+VERSION_COMMANDS = [
+    "lilypond --version",
+    "pdflatex --version",
+]
 import pprint
 def _CheckPrerequisites():
     logging.info("Checking prerequisites")
     any_failed = False
     for cmd_dict in PREREQUISITES:
-        logging.debug(">> {0}".format(pprint.pformat(cmd_dict)))
+        ##logging.debug(">> {0}".format(pprint.pformat(cmd_dict)))
         cmd = cmd_dict.pop( "cmd")
         _help = cmd_dict.pop("help", None)
         try:
@@ -118,6 +126,10 @@ def _CheckPrerequisites():
     
     if any_failed:
         sys.exit(EXIT_BAD_PREREQUISITES)
+    
+    for ver_cmd in VERSION_COMMANDS:
+        out, _ = RunCMD( ver_cmd, write_to_log = False)
+        logging.info( "Using %s", out.splitlines()[0].strip())
 
 INCLUDE_DEFAULTS = ["inc", "scores", os.getcwd()]
 def ParseOptions( options = None, args = None, **kwargs):
@@ -159,13 +171,19 @@ def ParseOptions( options = None, args = None, **kwargs):
             sys.exit( EXIT_BAD_PARAMETERS)
     
     if isinstance(options.include_dirs, str):
+        # transform given include directories to list
         options.include_dirs = options.include_dirs.split(",")
+        if "." not in options.include_dirs:
+            options.include_dirs.append(".")
+    
     if not options.include_dirs:
         options.include_dirs = INCLUDE_DEFAULTS
     
     # transform relative paths to absolute - we'll have to jump around a bit.
     options.include_dirs = [ p if os.path.isabs( p) else os.path.abspath( p) for p in options.include_dirs]
-    
+
+    logging.debug("Using include directories:\n%s", "\n".join( options.include_dirs))
+
     main_file, _ = os.path.splitext( options.lytex_file)
     options.tex_file = main_file + ".tex"
     options.pdf_file = main_file + ".pdf"

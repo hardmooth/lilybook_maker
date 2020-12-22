@@ -84,7 +84,7 @@ def SaveConfig( verify = True, backup_if_existing = False):
 
 def RunCMD(cmd, raise_on_error = True, write_to_log = True, decode_std = True, env = None, path_pre = None):
     def _ToStr( str_or_b):
-        _as_str = str_or_b.decode(locale.getpreferredencoding()) if not isinstance( str_or_b, str) else str_or_b
+        _as_str = str_or_b.decode(locale.getpreferredencoding(), errors = "replace") if not isinstance( str_or_b, str) else str_or_b
         _as_str = _as_str.replace("\r\n", "\n")
         return _as_str
     
