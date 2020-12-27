@@ -193,7 +193,7 @@ def ParseOptions( options = None, args = None, **kwargs):
 def Ly2Tex(options,args):
     os.environ["path"] = "{0};{1}".format( os.environ["path"], os.getcwd())
     os.environ["PATH"] = "{0};{1}".format( os.environ["PATH"], os.getcwd())
-    cmd = [ CMD_LILYPOND, u"--pdf",
+    cmd = [ CMD_LILYPOND, u"--pdf", 
           ] + [u"--include={0}".format( inc)
                for inc in options.include_dirs
           ] + ["--output={0}".format( options.output_dir),
@@ -219,18 +219,20 @@ def Tex2PDF(options, args):
     logging.info("tex2pdf %s", options.tex_file)
     last_dir = os.getcwd()
     os.chdir( options.output_dir)
-    
-    cmd = [ CMD_PDFLATEX,
-            "-interaction=nonstopmode",
-          ] + [f"-include-directory={_dir}" for _dir in options.include_dirs
-          ] + [ options.tex_file]
+
+    latex_args = [f"--include-directory={_dir}" for _dir in options.include_dirs ] + [ options.tex_file]
+
+    # run pdflatex / texify
+    # (texify automaticaly creates index files and thus allows for an index)
+    cmd = [ CMD_PDFLATEX] + latex_args
     RunCMD( cmd, write_to_log = True)
-    
+
     shutil.copyfile( options.pdf_file,
-                     os.path.join( last_dir,           options.pdf_file))
+                     os.path.join( last_dir, options.pdf_file))
     
     os.chdir( last_dir)
     _size = sizeof_fmt( os.stat( options.pdf_file).st_size)
+    logging.info("-" * 40)
     logging.info("Written %s to %s", _size, options.pdf_file)
 
 ERROR_REGEX = [
@@ -250,6 +252,7 @@ def CheckLogForErrors( print_to_stdout = False):
                                                                     LOG_FILE,
                                                                     "\n".join( "[{0:4}] {1}".format( i, line) 
                                                                                for i, line in grepped_lines))
+        logging.info("-" * 40)
         logging.info( msg)
         if print_to_stdout:
             print("-" * 60)
@@ -274,9 +277,12 @@ def RunMain( options = None,
     Ly2Tex (options, args)
     Tex2PDF(options, args)
     CheckLogForErrors()
+    logging.info("=" * 40)
     
 if __name__ == '__main__':
     loggingSetup( LOG_FILE)
+    logging.info("== lilybook PDF builder ==")
+    logging.info("=" * 40)
     logging.info("Working in %s", os.getcwd())
     try:
         _AddLilypondToPath()
