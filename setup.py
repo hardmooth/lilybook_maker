@@ -126,7 +126,7 @@ def RunMain( options = None,
 
         config = GetConfig()
         config["lilypond"]["PATH_LILYPOND"] = lily_path
-        config["latex"]["CMD_PDFLATEX"] = "texify --pdf"
+        config["latex"]["CMD_PDFLATEX"] = "texify --pdf --batch"
 
         SaveConfig()
         

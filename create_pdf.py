@@ -139,6 +139,8 @@ def ParseOptions( options = None, args = None, **kwargs):
                       help="List (comma separated) of include directories. Defaults '{0}' if existing.".format(",".join(INCLUDE_DEFAULTS)))
     parser.add_option("-o", "--out",        dest="output_dir", help="output directory for temporary files", default="out")
 
+    parser.add_option("-F", "--full", dest="FullBuild", help="Do a full (re)build and discard anything in the <out> directory before building.")
+
     ##################################################################################
     # adapt set parameters according to passed arguments, e.g. when used as a module #
     ##################################################################################
@@ -161,14 +163,18 @@ def ParseOptions( options = None, args = None, **kwargs):
     ###################################
 
     if not options.lytex_file:
-        lytex_files = glob.glob( "*.lytex")
-        if len(lytex_files) == 1:
-            options.lytex_file = lytex_files[0]
-            logging.info("No input file specified. Detected '{0}'.".format( options.lytex_file))
+        last_arg = sys.argv[-1]
+        if os.path.exists( last_arg) and last_arg.lower().endswith("lytex"):
+            options.lytex_file = last_arg
         else:
-            logging.error("no input file specified. Exiting.")
-            parser.print_help()
-            sys.exit( EXIT_BAD_PARAMETERS)
+            lytex_files = glob.glob( "*.lytex")
+            if len(lytex_files) == 1:
+                options.lytex_file = lytex_files[0]
+                logging.info("No input file specified. Detected '{0}'.".format( options.lytex_file))
+            else:
+                logging.error("no input file specified. Exiting.")
+                parser.print_help()
+                sys.exit( EXIT_BAD_PARAMETERS)
     
     if isinstance(options.include_dirs, str):
         # transform given include directories to list
@@ -187,6 +193,8 @@ def ParseOptions( options = None, args = None, **kwargs):
     main_file, _ = os.path.splitext( options.lytex_file)
     options.tex_file = main_file + ".tex"
     options.pdf_file = main_file + ".pdf"
+
+    options.wdir = os.getcwd()
 
     return options, args
 
@@ -241,12 +249,25 @@ ERROR_REGEX = [
     re.compile( r"error"   , re.IGNORECASE),
     re.compile( r"critical", re.IGNORECASE),
 ]
-def CheckLogForErrors( print_to_stdout = False):
+LOG_FILE_PATTERN = re.compile(r"[A-Z]:[\\/][^ ]+\.log")
+def CheckLogForErrors( print_to_stdout = False, copy_to_wdir = True):
     grepped_lines = []
     with open(LOG_FILE, "r") as log_fh:
         for i, line in enumerate( log_fh):
             if any( pat.search( line) for pat in ERROR_REGEX):
                 grepped_lines.append( (i, line.rstrip()))
+            
+            if copy_to_wdir:
+                m = LOG_FILE_PATTERN.search( line)
+                if m:
+                    fpath = m.group()
+                    if os.path.exists( fpath):
+                        try:
+                            shutil.copyfile( fpath, options.wdir)
+                            logging.warning( "Found Error log file '%s' and copied to '%s'", fpath, options.wdir)
+                        except:
+                            pass
+        
     if grepped_lines:
         msg = "{0} Errors/warnings from log file {1}:\n{2}".format( len( grepped_lines),
                                                                     LOG_FILE,
@@ -274,9 +295,22 @@ def RunMain( options = None,
     ####################
     # work starts here #
     ####################
-    Ly2Tex (options, args)
-    Tex2PDF(options, args)
-    CheckLogForErrors()
+    if options.FullBuild:
+        logging.info("Full Rebuild ... deleting in %s", options.output_dir)
+        if os.path.exists( options.output_dir):
+            files_or_dirs = glob.glob( os.path.join( options.output_dir, "*"))
+            for fd in files_or_dirs:
+                if os.path.isdir( fd):
+                    shutil.rmtree( fd, ignore_errors=True)
+                elif os.path.isfile( fd):
+                    os.remove( fd)
+            logging.info("Deleted %s files/directories", len( files_or_dirs))
+
+    try:
+        Ly2Tex (options, args)
+        Tex2PDF(options, args)
+    finally:
+         CheckLogForErrors()
     logging.info("=" * 40)
     
 if __name__ == '__main__':
