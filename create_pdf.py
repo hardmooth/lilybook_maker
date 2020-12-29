@@ -163,9 +163,13 @@ def ParseOptions( options = None, args = None, **kwargs):
     ###################################
 
     if not options.lytex_file:
-        last_arg = sys.argv[-1]
-        if os.path.exists( last_arg) and last_arg.lower().endswith("lytex"):
-            options.lytex_file = last_arg
+        arg_lytex_files = [ arg for arg in sys.argv if arg.lower().endswith("lytex") and os.path.exists( arg)]
+        if len( arg_lytex_files) == 1:
+            options.lytex_file = arg_lytex_files[0]
+        elif len( arg_lytex_files) > 1:
+            logging.error("Too many LYTEX files specified - exiting.")
+            parser.print_help()
+            sys.exit( EXIT_BAD_PARAMETERS)
         else:
             lytex_files = glob.glob( "*.lytex")
             if len(lytex_files) == 1:
