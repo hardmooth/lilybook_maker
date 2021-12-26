@@ -128,13 +128,13 @@ def RunMain( options = None,
         config["lilypond"]["PATH_LILYPOND"] = lily_path
         config["latex"]["CMD_PDFLATEX"] = "texify --pdf --batch"
 
-        SaveConfig()
-        
-        return
-
-    if options.CheckPrerequisites:
+    if options.CheckPrerequisites or options.InitConfig:
         _AddLilypondToPath()
         _CheckPrerequisites()
+    
+    if options.InitConfig:
+        SaveConfig()
+
 
 if __name__ == "__main__":
     loggingSetup( LOG_FILE, print_to_stdout = True)

@@ -10,9 +10,11 @@ import configparser
 import locale
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
+import threading
 
 # -- pip ---
 
@@ -81,19 +83,26 @@ def SaveConfig( verify = True, backup_if_existing = False):
         config.write( fh)
     logging.info("Written configuration to %s", _CONFIG_FILE)
 
-
-def RunCMD(cmd, raise_on_error = True, write_to_log = True, decode_std = True, env = None, path_pre = None):
-    def _ToStr( str_or_b):
-        _as_str = str_or_b.decode(locale.getpreferredencoding(), errors = "replace") if not isinstance( str_or_b, str) else str_or_b
-        _as_str = _as_str.replace("\r\n", "\n")
-        return _as_str
+def NormalizeOutput( data, truncate = False):
+    if isinstance( data, bytes):
+        data = data.decode(locale.getpreferredencoding(), errors = "replace")
     
+    # remove mult-line-breaks and trailing whitespaces
+    data = re.sub(r"[\r\n]+", "\n", data).rstrip()
+
+    if truncate:
+        data_lines = data.splitlines()
+        data = "\n".join( data_lines[:2] + ["... ({} lines)".format( len(data_lines) - 4)] if len(data_lines) > 4 else [] + data_lines[-2:])
+
+    return data
+
+def RunCMD(cmd, raise_on_error = True, write_to_log = True, decode_std = True, env = None, path_pre = None, timeout_sec = None):
+    if isinstance(cmd, list):
+        cmd = " ".join(cmd)
+
     if write_to_log:
         logging.info ( "CMD: {0}".format( cmd))
 
-    if isinstance(cmd, list):
-        cmd = " ".join(cmd)
-        
     if path_pre:
         _env  = env if env else os.environ
         _path = "{0}:{1}".format( path_pre if isinstance( path_pre, str) else ";".join(path_pre), os.environ["path"])
@@ -102,12 +111,16 @@ def RunCMD(cmd, raise_on_error = True, write_to_log = True, decode_std = True, e
         ##logging.debug("ENV:{0}".format( pprint.pformat( _env)))
     else:
         _env = None
+    
+    timer = None
          
     try:
         p = subprocess.Popen( cmd,
                               stdout = subprocess.PIPE,
                               stderr = subprocess.PIPE,
                               env    = _env)
+        if timeout_sec is not None:
+            timer = threading.Timer( timeout_sec, p.kill)
         stdout, stderr = p.communicate()
         ret_code = p.returncode
     except Exception as exc:
@@ -116,25 +129,29 @@ def RunCMD(cmd, raise_on_error = True, write_to_log = True, decode_std = True, e
         logging.critical( "EXC: {0}".format( repr(exc)))
         logging.exception( "exception:")
         sys.exit(EXIT_CRITICAL)
+    finally:
+        if timer:
+            timer.cancel()
     
     if write_to_log:
-        logging.debug( "OUT: {0}".format( _ToStr( stdout)))
-        logging.debug( "ERR: {0}".format( _ToStr( stderr)))
+        logging.debug( "OUT: {0}".format( NormalizeOutput( stdout)))
+        logging.debug( "ERR: {0}".format( NormalizeOutput( stderr)))
     
     if ret_code and stderr and raise_on_error:
-        _msg = ("CMD FAILED: {0}\n"
+        _msg = ("CMD FAILED (rc={3}): {0}\n"
                 "-- STDOUT --\n"
                 "{1}\n"
                 "-- STDERR -- \n"
                 "{2}\n"
                 "------------"
                ).format( cmd, 
-                         stdout.rstrip().decode(locale.getpreferredencoding(), errors = "replace"), 
-                         stderr.rstrip().decode(locale.getpreferredencoding(), errors = "replace"))
+                         NormalizeOutput(stdout, truncate = write_to_log), 
+                         NormalizeOutput(stderr, truncate = write_to_log),
+                         ret_code)
         raise RuntimeError("CMD failed: '{0}'".format(_msg))
     
     if decode_std:
-        stdout = stdout.rstrip().decode(locale.getpreferredencoding(), errors = "replace") 
-        stderr = stderr.rstrip().decode(locale.getpreferredencoding(), errors = "replace")
+        stdout = NormalizeOutput(stdout) 
+        stderr = NormalizeOutput(stderr)
     
     return stdout, stderr

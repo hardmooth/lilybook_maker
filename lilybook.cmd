@@ -1,7 +1,7 @@
 :: This script tries 
 :: 
-:: usage
-::   1. 
+:: usage (either of the following)
+::   * 
 ::  
 :: 
 :: Setup:

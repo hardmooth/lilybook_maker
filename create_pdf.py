@@ -46,8 +46,10 @@ from base import RunCMD, EXIT_BAD_PARAMETERS, EXIT_BAD_PREREQUISITES, EXIT_CRITI
 # ------------------------------------------------------------------------------------------------
 
 PATH_LILYPOND = GetConfig()["lilypond"]["PATH_LILYPOND"]
+#: find a valid lilypond-book python script file (upto version lilypond 20.* it was "lilypond-book.py", somewhen after only "lilypond-book")
+PATH_LILYPOND_BOOK = next( p for p in [os.path.join( PATH_LILYPOND, u"lilypond-book.py"), os.path.join( PATH_LILYPOND, u"lilypond-book")] if os.path.exists(p))
 CMD_LILYPOND  = u'"{py}" "{lp}"'.format( py = os.path.join( PATH_LILYPOND, u"python.exe"),
-                                         lp = os.path.join( PATH_LILYPOND, u"lilypond-book.py"))
+                                         lp = PATH_LILYPOND_BOOK)
 CMD_PDFLATEX  = GetConfig()["latex"]["CMD_PDFLATEX"]
 
 #: log file to write to (create_pdf.log in the current working directory)
@@ -114,7 +116,7 @@ def _CheckPrerequisites():
         try:
             stdout, stderr = RunCMD(cmd = cmd, raise_on_error = False, write_to_log = False, **cmd_dict)    #: pylint: disable repeated-keyword
             if stdout and not stderr:
-                logging.info("<< OK")
+                logging.info("<< OK: {}".format( cmd))
             else:
                 logging.info("<< FAILED:\n{0}".format( stderr))
                 any_failed = True
@@ -139,7 +141,7 @@ def ParseOptions( options = None, args = None, **kwargs):
                       help="List (comma separated) of include directories. Defaults '{0}' if existing.".format(",".join(INCLUDE_DEFAULTS)))
     parser.add_option("-o", "--out",        dest="output_dir", help="output directory for temporary files", default="out")
 
-    parser.add_option("-F", "--full", dest="FullBuild", help="Do a full (re)build and discard anything in the <out> directory before building.")
+    parser.add_option("-F", "--full", dest="FullBuild", action="store_true", help="Do a full (re)build and discard anything in the <out> directory before building.")
 
     ##################################################################################
     # adapt set parameters according to passed arguments, e.g. when used as a module #
@@ -237,7 +239,7 @@ def Tex2PDF(options, args):
     # run pdflatex / texify
     # (texify automaticaly creates index files and thus allows for an index)
     cmd = [ CMD_PDFLATEX] + latex_args
-    RunCMD( cmd, write_to_log = True)
+    RunCMD( cmd, write_to_log = True, timeout_sec = 15 * 60)
 
     shutil.copyfile( options.pdf_file,
                      os.path.join( last_dir, options.pdf_file))
