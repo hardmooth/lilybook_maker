@@ -143,6 +143,8 @@ def ParseOptions( options = None, args = None, **kwargs):
 
     parser.add_option("-F", "--full", dest="FullBuild", action="store_true", help="Do a full (re)build and discard anything in the <out> directory before building.")
 
+    parser.add_option("-s", "--strict", dest="Strict", action="store_true", default=False, help="Abort on the first error (or keep going?).")
+
     ##################################################################################
     # adapt set parameters according to passed arguments, e.g. when used as a module #
     ##################################################################################
@@ -215,7 +217,7 @@ def Ly2Tex(options,args):
                ]
     try:
         logging.info("Running lilypond-book")
-        out, err = RunCMD( cmd, path_pre = PATH_LILYPOND, write_to_log = True)
+        out, err = RunCMD( cmd, path_pre = PATH_LILYPOND, write_to_log = True, raise_on_error=options.Strict)
     except Exception as exc:
         logging.critical(exc)
         logging.critical(pprint.pformat(exc))
@@ -239,7 +241,7 @@ def Tex2PDF(options, args):
     # run pdflatex / texify
     # (texify automaticaly creates index files and thus allows for an index)
     cmd = [ CMD_PDFLATEX] + latex_args
-    RunCMD( cmd, write_to_log = True, timeout_sec = 15 * 60)
+    RunCMD( cmd, write_to_log = True, raise_on_error=options.Strict, timeout_sec = 15 * 60)
 
     shutil.copyfile( options.pdf_file,
                      os.path.join( last_dir, options.pdf_file))
