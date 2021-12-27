@@ -36,12 +36,13 @@ import subprocess
 import sys
 import traceback
 
+from collections import defaultdict
 from optparse import OptionParser
 
 # -- pip --
 
 # -- local imports --
-from base import RunCMD, EXIT_BAD_PARAMETERS, EXIT_BAD_PREREQUISITES, EXIT_CRITICAL, GetConfig
+from base import RunCMD, EXIT_BAD_PARAMETERS, EXIT_BAD_PREREQUISITES, EXIT_CRITICAL, GetConfig, LogTail
 
 # ------------------------------------------------------------------------------------------------
 
@@ -51,6 +52,8 @@ PATH_LILYPOND_BOOK = next( p for p in [os.path.join( PATH_LILYPOND, u"lilypond-b
 CMD_LILYPOND  = u'"{py}" "{lp}"'.format( py = os.path.join( PATH_LILYPOND, u"python.exe"),
                                          lp = PATH_LILYPOND_BOOK)
 CMD_PDFLATEX  = GetConfig()["latex"]["CMD_PDFLATEX"]
+
+OTHER_LOG_FILES = glob.glob(r"{}\MiKTeX\*\miktex\log\*.log".format( os.environ["localappdata"]))
 
 #: log file to write to (create_pdf.log in the current working directory)
 LOG_FILE = os.path.join( os.getcwd(), os.path.basename( __file__).rstrip("pyco") + "log")
@@ -252,18 +255,21 @@ def Tex2PDF(options, args):
     logging.info("Written %s to %s", _size, options.pdf_file)
 
 ERROR_REGEX = [
-    re.compile( r"output"  , re.IGNORECASE),
+    #re.compile( r"output"  , re.IGNORECASE),
     re.compile( r"warning" , re.IGNORECASE),
     re.compile( r"error"   , re.IGNORECASE),
     re.compile( r"critical", re.IGNORECASE),
 ]
 LOG_FILE_PATTERN = re.compile(r"[A-Z]:[\\/][^ ]+\.log")
+LOG_WATCHERS = []
 def CheckLogForErrors( print_to_stdout = False, copy_to_wdir = True):
-    grepped_lines = []
+    grepped_lines = defaultdict(list)
+    
+    # check our log file
     with open(LOG_FILE, "r") as log_fh:
         for i, line in enumerate( log_fh):
             if any( pat.search( line) for pat in ERROR_REGEX):
-                grepped_lines.append( (i, line.rstrip()))
+                grepped_lines[LOG_FILE].append( (i, line.rstrip()))
             
             if copy_to_wdir:
                 m = LOG_FILE_PATTERN.search( line)
@@ -275,18 +281,26 @@ def CheckLogForErrors( print_to_stdout = False, copy_to_wdir = True):
                             logging.warning( "Found Error log file '%s' and copied to '%s'", fpath, options.wdir)
                         except:
                             pass
+    
+    # check other log files (e.g. miktex for errors during pdflatex)
+    for lwatcher in LOG_WATCHERS:
+        if lwatcher.WasUpdated():
+            grepped_lines[lwatcher.path_to_file] = lwatcher.ReadLinesNumbered( line_grep = r"CRIT|FATAL")
         
     if grepped_lines:
-        msg = "{0} Errors/warnings from log file {1}:\n{2}".format( len( grepped_lines),
-                                                                    LOG_FILE,
-                                                                    "\n".join( "[{0:4}] {1}".format( i, line) 
-                                                                               for i, line in grepped_lines))
-        logging.info("-" * 40)
-        logging.info( msg)
-        if print_to_stdout:
-            print("-" * 60)
-            print(msg)
-            print("-" * 60)
+        for lfile, err_lines in grepped_lines.items():
+            if not err_lines:
+                continue
+            msg = "{0} Errors/warnings from log file {1}:\n{2}".format( len( err_lines),
+                                                                        lfile,
+                                                                        "\n".join( "[{0:4}] {1}".format( i, line) 
+                                                                                for i, line in err_lines))
+            logging.info("-" * 40)
+            logging.info( msg)
+            if print_to_stdout:
+                print("-" * 60)
+                print(msg)
+                print("-" * 60)
 
 def RunMain( options = None,
              args    = None,
@@ -304,7 +318,7 @@ def RunMain( options = None,
     # work starts here #
     ####################
     if options.FullBuild:
-        logging.info("Full Rebuild ... deleting in %s", options.output_dir)
+        logging.info("Full Rebuild ... deleting everything in '%s'", options.output_dir)
         if os.path.exists( options.output_dir):
             files_or_dirs = glob.glob( os.path.join( options.output_dir, "*"))
             for fd in files_or_dirs:
@@ -313,6 +327,11 @@ def RunMain( options = None,
                 elif os.path.isfile( fd):
                     os.remove( fd)
             logging.info("Deleted %s files/directories", len( files_or_dirs))
+    
+    if OTHER_LOG_FILES:
+        for lfile in OTHER_LOG_FILES:
+            LOG_WATCHERS.append( LogTail( lfile))
+            logging.debug("Watching %s", lfile)
 
     try:
         Ly2Tex (options, args)

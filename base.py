@@ -7,6 +7,7 @@ auxiliary functions used in other modules/scripts
 
 # -- python standard imports ---
 import configparser
+import enum
 import locale
 import logging
 import os
@@ -95,6 +96,60 @@ def NormalizeOutput( data, truncate = False):
         data = "\n".join( data_lines[:2] + ["... ({} lines)".format( len(data_lines) - 4)] if len(data_lines) > 4 else [] + data_lines[-2:])
 
     return data
+
+class LogTail:
+    """
+    Implements a log file watcher like the bash equivalent:
+        tail -f <path_to_file> | grep <line_grep>
+    
+    Usage::
+        log_watcher = LogTail(path_to_file)
+        # do something lengthy
+        print("Log file has {}".format( "changed:" if log_watcher.WasUpdated() else "no changes"))
+        if log_watcher.WasUpdated():
+            print(log_watcher.Read(line_grep = ))
+    
+    """
+    def __init__(self, path_to_file) -> None:
+        self.path_to_file = path_to_file
+        self._mod_time = os.path.getmtime( path_to_file)
+        self._base_size = os.path.getsize( path_to_file)
+    
+    def WasUpdated(self):
+        curr_mod_time = os.path.getmtime( self.path_to_file)
+        return curr_mod_time != self._mod_time
+    
+    def Read( self, read_mode = "r", line_grep = None):
+        with open( self.path_to_file, read_mode) as fh:
+            fh.seek(self._base_size)
+
+            data = fh.read()
+        
+        # return all data
+        if line_grep is None:
+            return data
+        
+        # only return lines that match/contain the given regex
+        lines = data.splitlines()
+        return "\n".join( l for l in lines if re.search( line_grep, l))
+    
+    def ReadLinesNumbered( self, line_grep):
+        with open( self.path_to_file, "r") as fh:
+            # read the stuff before
+            data_prev = fh.read(self._base_size)
+            line_offset = len(data_prev.splitlines())
+
+            # now the actual data
+            data = fh.read()
+        
+        lines_numbered = [
+            (lno, line)
+            for lno, line in enumerate( data.splitlines(), start = line_offset)
+            if re.search( line_grep, line)
+        ]
+
+        return lines_numbered
+
 
 def RunCMD(cmd, raise_on_error = True, write_to_log = True, decode_std = True, env = None, path_pre = None, timeout_sec = None):
     if isinstance(cmd, list):
