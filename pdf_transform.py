@@ -36,7 +36,7 @@ def ParseOptions( options = None, args = None, **kwargs):
     # adapt set parameters according to passed arguments, e.g. when used as a module #
     ##################################################################################
 
-    if options is None:
+    if options is None and not kwargs:
         options, args =  parser.parse_args(sys.argv)
     elif isinstance(options, str):
         options, args =  parser.parse_args([options, args])
@@ -44,6 +44,9 @@ def ParseOptions( options = None, args = None, **kwargs):
         _opts = options
         options, args =  parser.parse_args([u''])
         options.__dict__.update(_opts)
+    elif kwargs:
+        options, args =  parser.parse_args([u''])
+        options.__dict__.update( kwargs)
     elif isinstance(options, tuple):
         options, args = options
 

@@ -42,6 +42,7 @@ from optparse import OptionParser
 # -- pip --
 
 # -- local imports --
+import pdf_transform
 from base import RunCMD, EXIT_BAD_PARAMETERS, EXIT_BAD_PREREQUISITES, EXIT_CRITICAL, GetConfig, LogTail
 
 # ------------------------------------------------------------------------------------------------
@@ -145,6 +146,7 @@ def ParseOptions( options = None, args = None, **kwargs):
     parser.add_option("-o", "--out",        dest="output_dir", help="output directory for temporary files", default="out")
 
     parser.add_option("-F", "--full", dest="FullBuild", action="store_true", help="Do a full (re)build and discard anything in the <out> directory before building.")
+    parser.add_option("-b", "--booklet", dest="Booklet", action="store_true", default=False, help="Add Booklet print output")
 
     parser.add_option("-s", "--strict", dest="Strict", action="store_true", default=False, help="Abort on the first error (or keep going?).")
 
@@ -254,6 +256,15 @@ def Tex2PDF(options, args):
     logging.info("-" * 40)
     logging.info("Written %s to %s", _size, options.pdf_file)
 
+    if options.Booklet:
+        logging.info("Creating booklet")
+        booklet_file = os.path.splitext( options.pdf_file)[0] + "-booklet.pdf"
+        pdf_transform.RunMain( input = options.pdf_file, output = booklet_file, pages=":", Booklet=True)
+        if os.path.exists( booklet_file):
+            logging.info("Written booklet file: %s", booklet_file)
+        else:
+            logging.error("No booklet file generated.")
+
 ERROR_REGEX = [
     #re.compile( r"output"  , re.IGNORECASE),
     re.compile( r"warning" , re.IGNORECASE),
@@ -341,6 +352,8 @@ def RunMain( options = None,
     logging.info("=" * 40)
     
 if __name__ == '__main__':
+    if False:
+        input("Connect to debugger?")
     loggingSetup( LOG_FILE)
     logging.info("== lilybook PDF builder ==")
     logging.info("=" * 40)
