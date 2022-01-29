@@ -16,6 +16,14 @@ import sys
 # pip imports
 import PyPDF2   # pip install PyPDF2
 
+SCALE_SPACE_UNIT_TO_CM = 2.54 / 72
+SCALE_CM_TO_SPACE_UNIT = 72 / 2.54
+PAGE_FORMATS = dict(
+    A3 = (29.7 * SCALE_CM_TO_SPACE_UNIT, 42.0 * SCALE_CM_TO_SPACE_UNIT),
+    A4 = (21.0 * SCALE_CM_TO_SPACE_UNIT, 29.7 * SCALE_CM_TO_SPACE_UNIT),
+    A5 = (14.8 * SCALE_CM_TO_SPACE_UNIT, 21.0 * SCALE_CM_TO_SPACE_UNIT),
+)
+
 PAGES_ALL = ":"
 def ParseOptions( options = None, args = None, **kwargs):
     from optparse import OptionParser
@@ -23,7 +31,7 @@ def ParseOptions( options = None, args = None, **kwargs):
     parser = OptionParser()
     parser.add_option("-i", "--input",      dest="input",     help="Input  file name")
     parser.add_option("-o", "--output",     dest="output",    help="output file name")
-    parser.add_option("-p", "--pages",      dest="pages",
+    parser.add_option("-p", "--pages",      dest="pages",     default = PAGES_ALL, 
                       help=("read those pages. Starts at 0. a comma-separated list of index descriptions."
                             "e.g. '0,1' (page 0, then 1) OR ':' (all pages) OR ':,:' (all pages twice)"))
     parser.add_option("-2", "--2on1",       dest="TwoOnOne",  action="store_true", default="False", help="Write as '2 on 1'")
@@ -31,6 +39,7 @@ def ParseOptions( options = None, args = None, **kwargs):
     parser.add_option("-b", "--booklet",    dest="Booklet",   action="store_true", default = False, help="Print as (2on1) booklet.")
     
     parser.add_option("-s", "--silent",     dest="Silent", action="store_true", default=False, help="No output to stdout")
+    parser.add_option("-F", "--format",     dest="PageFormat", action="store", default=None, help="Target page format (any of: {})".format( ",".join( sorted(PAGE_FORMATS.keys()))))
 
     ##################################################################################
     # adapt set parameters according to passed arguments, e.g. when used as a module #
@@ -70,6 +79,9 @@ def ParseOptions( options = None, args = None, **kwargs):
             pass
 
     return options, args
+
+def _ScalePageTo( page_object, target_format):
+    pass
 
 TWO_ON_ONE_LAYOUT = "/OneColumn"
 def RunMain( options = None,
@@ -121,7 +133,7 @@ def RunMain( options = None,
                 for idx_lt, idx_rg in zip( page_iter, page_iter):
                     log( "[MRG] Merging pages:", idx_lt, idx_rg, "->", pdf_writer.getNumPages())
 
-                    page_lt = pdf_reader.getPage(idx_lt)
+                    page_lt = pdf_reader.getPage( idx_lt)
                     page_rt = pdf_reader.getPage( idx_rg)
 
                     # get height and width
@@ -129,6 +141,14 @@ def RunMain( options = None,
                     _width  = float(_bbox[2] - _bbox[0])
                     _height = float(_bbox[3] - _bbox[1])
                     _scale  = math.sqrt(0.5)
+
+                    if options.PageFormat:
+                        if _width < _height:
+                            _scale *= (PAGE_FORMATS[options.PageFormat][0] / _height)
+                            _width, _height = PAGE_FORMATS[ options.PageFormat]
+                        else:
+                            _scale *= (PAGE_FORMATS[options.PageFormat][0] / _width)
+                            _height,_width = PAGE_FORMATS[ options.PageFormat]
 
                     # create empty page with swapped width/height
                     page_merged = PyPDF2.pdf.PageObject.createBlankPage( width  = _height,
@@ -145,17 +165,32 @@ def RunMain( options = None,
                     pdf_writer.addPage( page_merged)
             else:
                 for pg in _pages:
-                    pdf_writer.addPage( pdf_reader.getPage(pg))
+                    pg_object = pdf_reader.getPage(pg)
+
+                    if options.PageFormat:
+                        _bbox = pg_object.mediaBox
+                        _width  = float(_bbox[2] - _bbox[0])
+                        _height = float(_bbox[3] - _bbox[1])
+                        if _width < _height:
+                            _scale = (PAGE_FORMATS[options.PageFormat][0] / _width)
+                        else:
+                            _scale = (PAGE_FORMATS[options.PageFormat][0] / _height)
+                        pg_object.scaleBy( _scale)
+
+                    pdf_writer.addPage( pg_object)
 
         with open( options.output, "wb") as pdf_out:
             log( "[OUT] Writing to", options.output)
             pdf_writer.write( pdf_out)
 
 if __name__ == "__main__":
-    if False:
+    import os
+    os.chdir(os.path.dirname( os.path.abspath(__file__)))
+    if True:
         RunMain( pages    = ":,:",
-                 input    = 'WiseGuys_Staendchen_Melodie.pdf',
-                 output   = 'WiseGuys_Staendchen_Melodie_2on1.pdf',
-                 Rotate   = 90,
-                 TwoOnOne = True)
+                 input    = 'liederbuch.pdf',
+                 output   = 'liederbuch-booklet.pdf',
+                 TwoOnOne = True,
+                 Booklet  = True,
+                 PageFormat = "A4")
     RunMain()

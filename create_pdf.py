@@ -26,6 +26,7 @@ usage::
 """
 
 # -- python standard --
+import codecs
 import glob
 import locale
 import logging
@@ -137,6 +138,34 @@ def _CheckPrerequisites():
         out, _ = RunCMD( ver_cmd, write_to_log = False)
         logging.info( "Using %s", out.splitlines()[0].strip())
 
+def CheckEncoding( dir_path, filepatterns = r".*\.tex|.*\.lytex|.*\.ly", encoding = "utf-8"):
+    """Checks all files in the given directory whether they're correctly encoded.
+    Will log a warning for each invalidly encoded file.
+
+    Args:
+        dir_path (str): Path to directory
+        filepatterns (regexp, optional): regular repression to match files. Defaults to r".*\.tex|.*\.lytex|.*\.ly".
+        encoding (str, optional): Expected encoding. Defaults to "utf-8".
+
+    Returns:
+        bool: True, if all files seem valid; False if any yielded errors.
+    """
+    file_names = [ fname for fname in os.listdir( dir_path) if re.match( filepatterns, fname)]
+    encoding_valid = True
+    for fname in file_names:
+        fpath = os.path.join( dir_path, fname)
+        try:
+            with codecs.open( fpath, "r", encoding) as fh:
+                fh.read()
+        except Exception as exc:
+            logging.warning( "Invalidly encoded file '%s' (not %s): %s", fpath, encoding, exc)
+            encoding_valid = False
+    
+    if not encoding_valid:
+        logging.warning("Convert files to %s (e.g. with NotePad++ -> Encoding -> Convert to %s", encoding, encoding)
+
+    return encoding_valid
+
 INCLUDE_DEFAULTS = ["inc", "scores", os.getcwd()]
 def ParseOptions( options = None, args = None, **kwargs):
     parser = OptionParser()
@@ -202,6 +231,12 @@ def ParseOptions( options = None, args = None, **kwargs):
     options.include_dirs = [ p if os.path.isabs( p) else os.path.abspath( p) for p in options.include_dirs]
 
     logging.debug("Using include directories:\n%s", "\n".join( options.include_dirs))
+
+    # check encoding of files in include directories. 
+    # Any included file not correctly encoded in UTF8 will most likely break lilypond down. 
+    # So it's better to check this now, so authors have a pointer what broke where.
+    for inc_dir in options.include_dirs:
+        CheckEncoding( inc_dir)
 
     main_file, _ = os.path.splitext( options.lytex_file)
     options.tex_file = main_file + ".tex"
@@ -278,7 +313,7 @@ def CheckLogForErrors( print_to_stdout = False, copy_to_wdir = True):
     
     # check our log file
     with open(LOG_FILE, "r") as log_fh:
-        for i, line in enumerate( log_fh):
+        for i, line in enumerate( log_fh, start = 1):
             if any( pat.search( line) for pat in ERROR_REGEX):
                 grepped_lines[LOG_FILE].append( (i, line.rstrip()))
             
