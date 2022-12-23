@@ -1,0 +1,3 @@
+# install via (from Admin CMD)
+#   python -m pip install -r requirements_py.txt
+PyPDF2
