@@ -75,13 +75,14 @@ def FindLilypond( interactive = True):
     
     return lily["bin_path"]
 
-
-
+def InstallPyRequirements():
+    raise NotImplementedError
 
 def ParseOptions( options = None, args = None, **kwargs):
     parser = OptionParser()
     parser.add_option("--check", dest="CheckPrerequisites", action = "store_true", default = None,  help="Only check prerequisites")
     parser.add_option("--init",  dest="InitConfig", action="store_true", default = None, help = "Initialize setup/configuration")
+    ##parser.add_option("--install", dest="InstallPyRequirements", action="store_true", default=False, help="Install all Python PIP requirements (if missing)")
 
     ##################################################################################
     # adapt set parameters according to passed arguments, e.g. when used as a module #
@@ -128,13 +129,15 @@ def RunMain( options = None,
         config["lilypond"]["PATH_LILYPOND"] = lily_path
         config["latex"]["CMD_PDFLATEX"] = "texify --pdf --batch"
 
+    ##if options.InstallPyRequirements:
+    ##    InstallPyRequirements()
+
     if options.CheckPrerequisites or options.InitConfig:
         _AddLilypondToPath()
         _CheckPrerequisites()
     
     if options.InitConfig:
         SaveConfig()
-
 
 if __name__ == "__main__":
     loggingSetup( LOG_FILE, print_to_stdout = True)

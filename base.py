@@ -23,6 +23,7 @@ import threading
 
 
 # ------------------------------------------------------------------------------------------------
+EXIT_OK                = 0
 EXIT_BAD_PARAMETERS    = 1
 EXIT_BAD_PREREQUISITES = 2
 EXIT_CRITICAL          = 4 

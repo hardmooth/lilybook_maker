@@ -8,6 +8,11 @@ usage::
         python lilybook_maker/create_pdf.py 
     2. during run accept MikTeX-updates/installers
 
+alternative usage::
+    0. clone ...
+    1. add lilybook_maker to PATH
+    2. run lilybook.cmd with commands for create_pdf.py
+
 @todo: run from external directory, e.g. d:/work/lilybook_maker/ and list logging info correctly
 @todo: let setup.py crate "build.cmd"
 
@@ -31,6 +36,7 @@ import glob
 import locale
 import logging
 import os
+import pkg_resources
 import re
 import shutil
 import subprocess
@@ -43,8 +49,11 @@ from optparse import OptionParser
 # -- pip --
 
 # -- local imports --
-import pdf_transform
-from base import RunCMD, EXIT_BAD_PARAMETERS, EXIT_BAD_PREREQUISITES, EXIT_CRITICAL, GetConfig, LogTail
+try:
+    import pdf_transform
+except ModuleNotFoundError:
+    pdf_transform = None
+from base import RunCMD, EXIT_OK, EXIT_BAD_PARAMETERS, EXIT_BAD_PREREQUISITES, EXIT_CRITICAL, GetConfig, LogTail
 
 # ------------------------------------------------------------------------------------------------
 
@@ -111,15 +120,18 @@ VERSION_COMMANDS = [
     "pdflatex --version",
 ]
 import pprint
+PKG_REQ_FILE = os.path.join( os.path.dirname( __file__), "requirements_py.txt")
 def _CheckPrerequisites():
     logging.info("Checking prerequisites")
+    logging.debug("Running python: %s", sys.version)
     any_failed = False
     for cmd_dict in PREREQUISITES:
         ##logging.debug(">> {0}".format(pprint.pformat(cmd_dict)))
-        cmd = cmd_dict.pop( "cmd")
-        _help = cmd_dict.pop("help", None)
+        kwargs = dict( cmd_dict)
+        cmd   = kwargs.pop( "cmd")
+        _help = kwargs.pop("help", None)
         try:
-            stdout, stderr = RunCMD(cmd = cmd, raise_on_error = False, write_to_log = False, **cmd_dict)    #: pylint: disable repeated-keyword
+            stdout, stderr = RunCMD(cmd = cmd, raise_on_error = False, write_to_log = False, **kwargs)    #: pylint: disable repeated-keyword
             if stdout and not stderr:
                 logging.info("<< OK: {}".format( cmd))
             else:
@@ -129,6 +141,25 @@ def _CheckPrerequisites():
             logging.error("<< FAILED with exception '{0}'\n{1}".format( exc, traceback.format_exc()))
             if _help:
                 logging.info("HELP: {0}".format(_help))
+            any_failed = True
+    
+    with open( PKG_REQ_FILE, "r", encoding = "utf8") as fh:
+        requirements = list(filter( None, [ line.strip() for line in fh.readlines() if not line.startswith("#") ]))
+        # check one by one to get all missing single packages
+        for req in requirements:
+            logging.info("Checking pip requirement '%s'", req)
+            try:
+                pkg_resources.require( [req])
+            except (pkg_resources.DistributionNotFound, pkg_resources.VersionConflict) as exc:
+                logging.error("<< Python Package error: %s", exc)
+                any_failed = True
+        
+        # try all together to find version conflicts (might result in a duplicate error)
+        logging.info("Checking pip requirements %s", requirements)
+        try:
+            pkg_resources.require( requirements)
+        except (pkg_resources.DistributionNotFound, pkg_resources.VersionConflict) as exc:
+            logging.error("<< Python Package error: %s", exc)
             any_failed = True
     
     if any_failed:
@@ -178,6 +209,7 @@ def ParseOptions( options = None, args = None, **kwargs):
     parser.add_option("-b", "--booklet", dest="Booklet", action="store_true", default=False, help="Add Booklet print output")
 
     parser.add_option("-s", "--strict", dest="Strict", action="store_true", default=False, help="Abort on the first error (or keep going?).")
+    parser.add_option("-c", "--check", dest="Check", action="store_true", default=False, help="Only Check prerequisites and exit")
 
     ##################################################################################
     # adapt set parameters according to passed arguments, e.g. when used as a module #
@@ -200,7 +232,7 @@ def ParseOptions( options = None, args = None, **kwargs):
     # check some options for validity #
     ###################################
 
-    if not options.lytex_file:
+    if not options.lytex_file and not options.Check:
         arg_lytex_files = [ arg for arg in sys.argv if arg.lower().endswith("lytex") and os.path.exists( arg)]
         if len( arg_lytex_files) == 1:
             options.lytex_file = arg_lytex_files[0]
@@ -225,7 +257,11 @@ def ParseOptions( options = None, args = None, **kwargs):
             options.include_dirs.append(".")
     
     if not options.include_dirs:
-        options.include_dirs = INCLUDE_DEFAULTS
+        options.include_dirs = [inc for inc in INCLUDE_DEFAULTS if os.path.exists(inc)]
+    
+    if options.Booklet:
+        if pdf_transform is None:
+            logging.error("pdf_transform is not importable")
     
     # transform relative paths to absolute - we'll have to jump around a bit.
     options.include_dirs = [ p if os.path.isabs( p) else os.path.abspath( p) for p in options.include_dirs]
@@ -237,10 +273,24 @@ def ParseOptions( options = None, args = None, **kwargs):
     # So it's better to check this now, so authors have a pointer what broke where.
     for inc_dir in options.include_dirs:
         CheckEncoding( inc_dir)
+    
+    if os.path.exists( os.path.join( "check.py")):
+        sys.path.append( os.getcwd())
+        try:
+            import check
+            if hasattr( check, "Check"):
+                logging.info("Found check.py - executing book specific checks")
+                check.Check()
+        except Exception as exc:
+            logging.error("Found check.py, but not importable: %s", exc)
 
-    main_file, _ = os.path.splitext( options.lytex_file)
-    options.tex_file = main_file + ".tex"
-    options.pdf_file = main_file + ".pdf"
+    try:
+        main_file, _ = os.path.splitext( options.lytex_file)
+        options.tex_file = main_file + ".tex"
+        options.pdf_file = main_file + ".pdf"
+    except TypeError:
+        options.tex_file = None
+        options.pdf_file = None
 
     options.wdir = os.getcwd()
 
@@ -359,6 +409,10 @@ def RunMain( options = None,
 
     # fetch and set parameters #
     options, args = ParseOptions(options, args, **kwargs)
+
+    if options.Check:
+        _CheckPrerequisites()
+        sys.exit( EXIT_OK)
     
     ####################
     # work starts here #
