@@ -90,3 +90,11 @@ Include directories are passed via `TEXINPUTS` instead of MiKTeX's `--include-di
     --check                only check prerequisites
 
 Booklets/2-on-1 can also be created separately with `pdf_transform.py --help`.
+
+## running the tests
+
+    python -m pip install -r requirements_dev.txt   # or: .venv/bin/pip install -r requirements_dev.txt
+    python -m pytest
+
+The integration tests build the minimal example book in `tests/data/minimal_book` and are skipped
+if lilypond, lilypond-book or pdflatex are not installed.

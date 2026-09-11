@@ -1,0 +1,4 @@
+# development requirements (in addition to requirements_py.txt)
+#   python -m pip install -r requirements_dev.txt
+-r requirements_py.txt
+pytest

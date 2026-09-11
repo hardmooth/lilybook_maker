@@ -1,0 +1,21 @@
+\documentclass[a5paper]{book}
+% preamble lives in inc/ - found via the include directories
+\input{preamble.tex}
+
+\begin{document}
+\tableofcontents
+
+\chapter{Erstes Lied}\index{Erstes Lied}
+\hello{} Umlaute: äöü ß
+
+% score lives in scores/ - found via the include directories
+\lilypondfile{alle_meine_entchen.ly}
+
+\chapter{Zweites Lied}\index{Zweites Lied}
+\lilypondfile{alle_meine_entchen.ly}
+
+\chapter{Drittes Kapitel}
+Nur Text.
+
+\printindex
+\end{document}

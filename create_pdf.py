@@ -454,7 +454,7 @@ ERROR_REGEX = [
     re.compile( r"critical", re.IGNORECASE),
 ]
 #: absolute path to a log file (windows: c:\..., linux: /...)
-LOG_FILE_PATTERN = re.compile(r"(?:[A-Z]:[\\/]|/)[^ '\"]+\.log")
+LOG_FILE_PATTERN = re.compile(r"(?<![^\s'\"=(])(?:[A-Z]:[\\/]|/)[^ '\"]+\.log")
 LOG_WATCHERS = []
 def CheckLogForErrors( print_to_stdout = False, copy_to_wdir = True, wdir = None):
     grepped_lines = defaultdict(list)
