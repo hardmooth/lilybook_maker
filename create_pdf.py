@@ -4,19 +4,19 @@ Dieses Skript erstellt eine Liedbuch-PDF aus Lilypond und LaTeX.
 
 usage::
     0. clone this repository (e.g. as submodule of your boook)
-    1. run from windows CMD:
-        python lilybook_maker/create_pdf.py 
-    2. during run accept MikTeX-updates/installers
+    1. run from windows CMD / linux shell:
+        python lilybook_maker/create_pdf.py
+    2. (Windows/MikTeX) during run accept MikTeX-updates/installers
 
 alternative usage::
     0. clone ...
     1. add lilybook_maker to PATH
-    2. run lilybook.cmd with commands for create_pdf.py
+    2. run lilybook.cmd (Windows) or lilybook.sh (Linux) with commands for create_pdf.py
 
 @todo: run from external directory, e.g. d:/work/lilybook_maker/ and list logging info correctly
 @todo: let setup.py crate "build.cmd"
 
-@note: if lilypond fails with "Pango-ERROR **: Unable to open font file ...", 
+@note: if lilypond fails with "Pango-ERROR **: Unable to open font file ...",
     one workaround could be to set the followiging environment variable::
         set FC_DEBUG=8191
 
@@ -33,10 +33,11 @@ alternative usage::
 # -- python standard --
 import codecs
 import glob
+import importlib.metadata
 import locale
 import logging
 import os
-import pkg_resources
+import pprint
 import re
 import shutil
 import subprocess
@@ -53,21 +54,59 @@ try:
     import pdf_transform
 except ModuleNotFoundError:
     pdf_transform = None
-from base import RunCMD, EXIT_OK, EXIT_BAD_PARAMETERS, EXIT_BAD_PREREQUISITES, EXIT_CRITICAL, GetConfig, LogTail
+from base import RunCMD, SplitCmd, PrependToPath, IS_WINDOWS, EXIT_OK, EXIT_BAD_PARAMETERS, EXIT_BAD_PREREQUISITES, EXIT_CRITICAL, GetConfig, LogTail
 
 # ------------------------------------------------------------------------------------------------
 
-PATH_LILYPOND = GetConfig()["lilypond"]["PATH_LILYPOND"]
-#: find a valid lilypond-book python script file (upto version lilypond 20.* it was "lilypond-book.py", somewhen after only "lilypond-book")
-PATH_LILYPOND_BOOK = next( p for p in [os.path.join( PATH_LILYPOND, u"lilypond-book.py"), os.path.join( PATH_LILYPOND, u"lilypond-book")] if os.path.exists(p))
-CMD_LILYPOND  = u'"{py}" "{lp}"'.format( py = os.path.join( PATH_LILYPOND, u"python.exe"),
-                                         lp = PATH_LILYPOND_BOOK)
-CMD_PDFLATEX  = GetConfig()["latex"]["CMD_PDFLATEX"]
+#: directory containing the lilypond binaries ("" means: use whatever is found in PATH)
+PATH_LILYPOND = GetConfig()["lilypond"]["PATH_LILYPOND"].strip()
 
-OTHER_LOG_FILES = glob.glob(r"{}\MiKTeX\*\miktex\log\*.log".format( os.environ["localappdata"]))
+def _FindLilypondBook():
+    """
+    find a valid lilypond-book script file
+    (upto version lilypond 20.* it was "lilypond-book.py", somewhen after only "lilypond-book")
+    """
+    candidates = []
+    if PATH_LILYPOND:
+        candidates += [ os.path.join( PATH_LILYPOND, "lilypond-book.py"),
+                        os.path.join( PATH_LILYPOND, "lilypond-book")]
+    found_in_path = shutil.which( "lilypond-book")
+    if found_in_path:
+        candidates.append( found_in_path)
+
+    return next( (p for p in candidates if os.path.exists(p)), None)
+
+PATH_LILYPOND_BOOK = _FindLilypondBook()
+
+def _BuildLilypondBookCmd():
+    """
+    Lilypond-book is a python script. On Windows (older lilypond bundles) it has to be run with the
+    python interpreter shipped with lilypond. On Linux (and newer bundles) it is directly executable.
+    """
+    if PATH_LILYPOND_BOOK is None:
+        return [ "lilypond-book"]   # let the prerequisites check report a helpful error
+
+    if IS_WINDOWS:
+        lily_python = os.path.join( PATH_LILYPOND, "python.exe")
+        if os.path.exists( lily_python):
+            return [ lily_python, PATH_LILYPOND_BOOK]
+
+    return [ PATH_LILYPOND_BOOK]
+
+#: lilypond-book command (as list of arguments)
+CMD_LILYPOND  = _BuildLilypondBookCmd()
+#: pdflatex command (string as configured, e.g. "pdflatex" or "texify --pdf --batch")
+CMD_PDFLATEX  = GetConfig()["latex"]["CMD_PDFLATEX"]
+#: True, if CMD_PDFLATEX is a wrapper that takes care of multiple LaTeX runs and index creation itself
+PDFLATEX_IS_WRAPPER = any( tool in CMD_PDFLATEX for tool in ("texify", "latexmk"))
+
+#: other log files to watch for errors (MiKTeX on Windows)
+OTHER_LOG_FILES = []
+if os.environ.get("LOCALAPPDATA"):
+    OTHER_LOG_FILES = glob.glob( os.path.join( os.environ["LOCALAPPDATA"], "MiKTeX", "*", "miktex", "log", "*.log"))
 
 #: log file to write to (create_pdf.log in the current working directory)
-LOG_FILE = os.path.join( os.getcwd(), os.path.basename( __file__).rstrip("pyco") + "log")
+LOG_FILE = os.path.join( os.getcwd(), os.path.splitext( os.path.basename( __file__))[0] + ".log")
 _logger = logging.getLogger()
 def loggingSetup( log_file, print_to_stdout = True):
     # reset log file if already existed
@@ -78,12 +117,12 @@ def loggingSetup( log_file, print_to_stdout = True):
     _logger.setLevel( logging.DEBUG)
 
     # log to file
-    file_handler = logging.FileHandler( filename= log_file)
+    file_handler = logging.FileHandler( filename= log_file, encoding = "utf-8")
     file_handler.setLevel( logging.DEBUG)
     file_handler.setFormatter( formatter)
     _logger.addHandler( file_handler)
 
-    # 
+    #
     if print_to_stdout:
         stdout_handler = logging.StreamHandler(sys.stdout)
         stdout_handler.setLevel( logging.INFO)
@@ -101,26 +140,46 @@ def sizeof_fmt(num, suffix='B'):
     return "%.1f%s%s" % (num, 'Yi', suffix)
 
 def _AddLilypondToPath():
-    os.environ["path"] = "{0};{1}".format( os.environ["path"], PATH_LILYPOND)
-    os.environ["PATH"] = "{0};{1}".format( os.environ["PATH"], PATH_LILYPOND)
+    PrependToPath( PATH_LILYPOND)
 
 PREREQUISITES = [
-    { "cmd": "{0} --help -v".format( CMD_LILYPOND),
-      "env": dict( os.environ, 
-                   PATH = "{};{}".format( PATH_LILYPOND, os.environ["PATH"]),
-                   path = "{};{}".format( PATH_LILYPOND, os.environ["path"])),
+    { "cmd": CMD_LILYPOND + [ "--help", "-v"],
+      "path_pre": PATH_LILYPOND,
       "help": "Install lilypond"},
-    { "cmd": "{0} --help".format( CMD_PDFLATEX),
-      "help": "Install PDFLaTeX", },
-    { "cmd": "lilypond --help",
-      "help": "add '{0}' to %PATH%".format( PATH_LILYPOND)},
+    { "cmd": SplitCmd( CMD_PDFLATEX) + [ "--help"],
+      "help": "Install PDFLaTeX (Windows: MiKTeX; Linux: texlive)", },
+    { "cmd": [ "lilypond", "--help"],
+      "path_pre": PATH_LILYPOND,
+      "help": "add '{0}' to PATH".format( PATH_LILYPOND) if PATH_LILYPOND else "Install lilypond and make sure it is in PATH"},
 ]
 VERSION_COMMANDS = [
-    "lilypond --version",
-    "pdflatex --version",
+    [ "lilypond", "--version"],
+    [ "pdflatex", "--version"],
 ]
-import pprint
-PKG_REQ_FILE = os.path.join( os.path.dirname( __file__), "requirements_py.txt")
+PKG_REQ_FILE = os.path.join( os.path.dirname( os.path.abspath( __file__)), "requirements_py.txt")
+
+def _CheckPyRequirement( req):
+    """Checks a single pip requirement line (e.g. "pypdf" or "pypdf>=3.0"). Returns an error message or None."""
+    m = re.match( r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*(.*?)\s*$", req)
+    if not m:
+        return "Cannot parse requirement '{}'".format( req)
+    name, specifier = m.groups()
+
+    try:
+        version = importlib.metadata.version( name)
+    except importlib.metadata.PackageNotFoundError:
+        return "The '{}' distribution was not found and is required (try: python -m pip install -r {})".format( req, PKG_REQ_FILE)
+
+    if specifier:
+        try:
+            from packaging.requirements import Requirement
+            if version not in Requirement( req).specifier:
+                return "{} {} is installed but {} is required".format( name, version, req)
+        except ImportError:
+            logging.debug("'packaging' not available - cannot verify version constraint '%s' (installed: %s)", req, version)
+
+    return None
+
 def _CheckPrerequisites():
     logging.info("Checking prerequisites")
     logging.debug("Running python: %s", sys.version)
@@ -130,47 +189,41 @@ def _CheckPrerequisites():
         kwargs = dict( cmd_dict)
         cmd   = kwargs.pop( "cmd")
         _help = kwargs.pop("help", None)
+        cmd_str = subprocess.list2cmdline( cmd)
         try:
             stdout, stderr = RunCMD(cmd = cmd, raise_on_error = False, write_to_log = False, **kwargs)    #: pylint: disable repeated-keyword
             if stdout and not stderr:
-                logging.info("<< OK: {}".format( cmd))
+                logging.info("<< OK: {}".format( cmd_str))
             else:
-                logging.info("<< FAILED:\n{0}".format( stderr))
+                logging.info("<< FAILED: {0}\n{1}".format( cmd_str, stderr))
+                if _help:
+                    logging.info("HELP: {0}".format(_help))
                 any_failed = True
         except BaseException as exc:
             logging.error("<< FAILED with exception '{0}'\n{1}".format( exc, traceback.format_exc()))
             if _help:
                 logging.info("HELP: {0}".format(_help))
             any_failed = True
-    
+
     with open( PKG_REQ_FILE, "r", encoding = "utf8") as fh:
         requirements = list(filter( None, [ line.strip() for line in fh.readlines() if not line.startswith("#") ]))
-        # check one by one to get all missing single packages
-        for req in requirements:
-            logging.info("Checking pip requirement '%s'", req)
-            try:
-                pkg_resources.require( [req])
-            except (pkg_resources.DistributionNotFound, pkg_resources.VersionConflict) as exc:
-                logging.error("<< Python Package error: %s", exc)
-                any_failed = True
-        
-        # try all together to find version conflicts (might result in a duplicate error)
-        logging.info("Checking pip requirements %s", requirements)
-        try:
-            pkg_resources.require( requirements)
-        except (pkg_resources.DistributionNotFound, pkg_resources.VersionConflict) as exc:
-            logging.error("<< Python Package error: %s", exc)
+    # check one by one to get all missing single packages
+    for req in requirements:
+        logging.info("Checking pip requirement '%s'", req)
+        error = _CheckPyRequirement( req)
+        if error:
+            logging.error("<< Python Package error: %s", error)
             any_failed = True
-    
+
     if any_failed:
         sys.exit(EXIT_BAD_PREREQUISITES)
-    
+
     for ver_cmd in VERSION_COMMANDS:
         out, _ = RunCMD( ver_cmd, write_to_log = False)
         logging.info( "Using %s", out.splitlines()[0].strip())
 
 def CheckEncoding( dir_path, filepatterns = r".*\.tex|.*\.lytex|.*\.ly", encoding = "utf-8"):
-    """Checks all files in the given directory whether they're correctly encoded.
+    r"""Checks all files in the given directory whether they are correctly encoded.
     Will log a warning for each invalidly encoded file.
 
     Args:
@@ -191,9 +244,9 @@ def CheckEncoding( dir_path, filepatterns = r".*\.tex|.*\.lytex|.*\.ly", encodin
         except Exception as exc:
             logging.warning( "Invalidly encoded file '%s' (not %s): %s", fpath, encoding, exc)
             encoding_valid = False
-    
+
     if not encoding_valid:
-        logging.warning("Convert files to %s (e.g. with NotePad++ -> Encoding -> Convert to %s", encoding, encoding)
+        logging.warning("Convert files to %s (e.g. with NotePad++ -> Encoding -> Convert to %s, or on linux: iconv -f latin1 -t utf-8)", encoding, encoding)
 
     return encoding_valid
 
@@ -249,31 +302,31 @@ def ParseOptions( options = None, args = None, **kwargs):
                 logging.error("no input file specified. Exiting.")
                 parser.print_help()
                 sys.exit( EXIT_BAD_PARAMETERS)
-    
+
     if isinstance(options.include_dirs, str):
         # transform given include directories to list
         options.include_dirs = options.include_dirs.split(",")
         if "." not in options.include_dirs:
             options.include_dirs.append(".")
-    
+
     if not options.include_dirs:
         options.include_dirs = [inc for inc in INCLUDE_DEFAULTS if os.path.exists(inc)]
-    
+
     if options.Booklet:
         if pdf_transform is None:
             logging.error("pdf_transform is not importable")
-    
+
     # transform relative paths to absolute - we'll have to jump around a bit.
     options.include_dirs = [ p if os.path.isabs( p) else os.path.abspath( p) for p in options.include_dirs]
 
     logging.debug("Using include directories:\n%s", "\n".join( options.include_dirs))
 
-    # check encoding of files in include directories. 
-    # Any included file not correctly encoded in UTF8 will most likely break lilypond down. 
+    # check encoding of files in include directories.
+    # Any included file not correctly encoded in UTF8 will most likely break lilypond down.
     # So it's better to check this now, so authors have a pointer what broke where.
     for inc_dir in options.include_dirs:
         CheckEncoding( inc_dir)
-    
+
     if os.path.exists( os.path.join( "check.py")):
         sys.path.append( os.getcwd())
         try:
@@ -297,9 +350,8 @@ def ParseOptions( options = None, args = None, **kwargs):
     return options, args
 
 def Ly2Tex(options,args):
-    os.environ["path"] = "{0};{1}".format( os.environ["path"], os.getcwd())
-    os.environ["PATH"] = "{0};{1}".format( os.environ["PATH"], os.getcwd())
-    cmd = [ CMD_LILYPOND, u"--pdf", 
+    PrependToPath( os.getcwd())
+    cmd = CMD_LILYPOND + [ u"--pdf",
           ] + [u"--include={0}".format( inc)
                for inc in options.include_dirs
           ] + ["--output={0}".format( options.output_dir),
@@ -315,28 +367,73 @@ def Ly2Tex(options,args):
         raise
     _tex_file = os.path.join( options.output_dir, options.tex_file)
     assert os.path.exists( _tex_file), "TeX-File '{0}' not generated.".format( _tex_file)
-    
-    with open(_tex_file) as fh:
+
+    with open(_tex_file, encoding = "utf-8", errors = "replace") as fh:
         line_count = len(fh.readlines())
-    
+
     logging.info( "Written %s lines to %s", line_count, _tex_file)
+
+LATEX_RERUN_PATTERN = re.compile( r"Rerun to get|Rerun LaTeX|There were undefined references|Label\(s\) may have changed")
+LATEX_MAX_RUNS = 4
+def _RunLatexLinux( options):
+    """
+    Runs pdflatex (TeX Live) the way MiKTeX's texify would do it:
+      * include directories are passed via the TEXINPUTS environment variable
+        (TeX Live has no --include-directory option and silently ignores it)
+      * repeated runs until table of contents / references are stable
+      * makeindex, if an index file was generated
+    """
+    env = dict( os.environ)
+    # trailing separator keeps the default search paths of the TeX distribution
+    env["TEXINPUTS"] = os.pathsep.join( options.include_dirs + [ env.get("TEXINPUTS", "")])
+
+    base_name = os.path.splitext( options.tex_file)[0]
+    latex_cmd = SplitCmd( CMD_PDFLATEX) + [ "-interaction=nonstopmode"]
+    if options.Strict:
+        latex_cmd += [ "-halt-on-error"]
+    latex_cmd += [ options.tex_file]
+
+    for run in range( 1, LATEX_MAX_RUNS + 1):
+        logging.info("LaTeX run %s/%s", run, LATEX_MAX_RUNS)
+        stdout, _ = RunCMD( latex_cmd, env = env, write_to_log = True, raise_on_error = False, timeout_sec = 15 * 60)
+
+        latex_errors = [ line for line in stdout.splitlines() if line.startswith("!")]
+        if latex_errors:
+            logging.error("LaTeX reported %s error(s):\n%s", len( latex_errors), "\n".join( latex_errors[:20]))
+            if options.Strict or not os.path.exists( options.pdf_file):
+                raise RuntimeError("pdflatex failed (see {}.log in '{}')".format( base_name, options.output_dir))
+
+        if PDFLATEX_IS_WRAPPER:
+            break
+
+        if run == 1 and os.path.exists( base_name + ".idx") and shutil.which( "makeindex"):
+            logging.info("Creating index")
+            RunCMD( [ "makeindex", base_name + ".idx"], write_to_log = True, raise_on_error = False)
+
+        if run > 1 and not LATEX_RERUN_PATTERN.search( stdout):
+            break
 
 def Tex2PDF(options, args):
     logging.info("tex2pdf %s", options.tex_file)
     last_dir = os.getcwd()
     os.chdir( options.output_dir)
 
-    latex_args = [f"--include-directory={_dir}" for _dir in options.include_dirs ] + [ options.tex_file]
+    try:
+        if IS_WINDOWS:
+            # run pdflatex / texify
+            # (texify automaticaly creates index files and thus allows for an index)
+            latex_args = [f"--include-directory={_dir}" for _dir in options.include_dirs ] + [ options.tex_file]
+            cmd = SplitCmd( CMD_PDFLATEX) + latex_args
+            RunCMD( cmd, write_to_log = True, raise_on_error=options.Strict, timeout_sec = 15 * 60)
+        else:
+            _RunLatexLinux( options)
 
-    # run pdflatex / texify
-    # (texify automaticaly creates index files and thus allows for an index)
-    cmd = [ CMD_PDFLATEX] + latex_args
-    RunCMD( cmd, write_to_log = True, raise_on_error=options.Strict, timeout_sec = 15 * 60)
+        assert os.path.exists( options.pdf_file), "PDF-File '{0}' not generated in '{1}'.".format( options.pdf_file, options.output_dir)
+        shutil.copyfile( options.pdf_file,
+                         os.path.join( last_dir, options.pdf_file))
+    finally:
+        os.chdir( last_dir)
 
-    shutil.copyfile( options.pdf_file,
-                     os.path.join( last_dir, options.pdf_file))
-    
-    os.chdir( last_dir)
     _size = sizeof_fmt( os.stat( options.pdf_file).st_size)
     logging.info("-" * 40)
     logging.info("Written %s to %s", _size, options.pdf_file)
@@ -344,7 +441,7 @@ def Tex2PDF(options, args):
     if options.Booklet:
         logging.info("Creating booklet")
         booklet_file = os.path.splitext( options.pdf_file)[0] + "-booklet.pdf"
-        pdf_transform.RunMain( input = options.pdf_file, output = booklet_file, pages=":", Booklet=True)
+        pdf_transform.RunMain( input = options.pdf_file, output = booklet_file, pages=":", Booklet=True, Silent = True)
         if os.path.exists( booklet_file):
             logging.info("Written booklet file: %s", booklet_file)
         else:
@@ -356,40 +453,45 @@ ERROR_REGEX = [
     re.compile( r"error"   , re.IGNORECASE),
     re.compile( r"critical", re.IGNORECASE),
 ]
-LOG_FILE_PATTERN = re.compile(r"[A-Z]:[\\/][^ ]+\.log")
+#: absolute path to a log file (windows: c:\..., linux: /...)
+LOG_FILE_PATTERN = re.compile(r"(?:[A-Z]:[\\/]|/)[^ '\"]+\.log")
 LOG_WATCHERS = []
-def CheckLogForErrors( print_to_stdout = False, copy_to_wdir = True):
+def CheckLogForErrors( print_to_stdout = False, copy_to_wdir = True, wdir = None):
     grepped_lines = defaultdict(list)
-    
+    wdir = wdir or os.getcwd()
+
     # check our log file
-    with open(LOG_FILE, "r") as log_fh:
+    with open(LOG_FILE, "r", encoding = "utf-8", errors = "replace") as log_fh:
         for i, line in enumerate( log_fh, start = 1):
             if any( pat.search( line) for pat in ERROR_REGEX):
                 grepped_lines[LOG_FILE].append( (i, line.rstrip()))
-            
+
             if copy_to_wdir:
                 m = LOG_FILE_PATTERN.search( line)
                 if m:
                     fpath = m.group()
-                    if os.path.exists( fpath):
+                    if os.path.isfile( fpath) and os.path.abspath( fpath) != os.path.abspath( LOG_FILE):
+                        target = os.path.join( wdir, os.path.basename( fpath))
+                        if os.path.abspath( fpath) == os.path.abspath( target):
+                            continue
                         try:
-                            shutil.copyfile( fpath, options.wdir)
-                            logging.warning( "Found Error log file '%s' and copied to '%s'", fpath, options.wdir)
-                        except:
+                            shutil.copyfile( fpath, target)
+                            logging.warning( "Found Error log file '%s' and copied to '%s'", fpath, target)
+                        except Exception:
                             pass
-    
+
     # check other log files (e.g. miktex for errors during pdflatex)
     for lwatcher in LOG_WATCHERS:
         if lwatcher.WasUpdated():
             grepped_lines[lwatcher.path_to_file] = lwatcher.ReadLinesNumbered( line_grep = r"CRIT|FATAL")
-        
+
     if grepped_lines:
         for lfile, err_lines in grepped_lines.items():
             if not err_lines:
                 continue
             msg = "{0} Errors/warnings from log file {1}:\n{2}".format( len( err_lines),
                                                                         lfile,
-                                                                        "\n".join( "[{0:4}] {1}".format( i, line) 
+                                                                        "\n".join( "[{0:4}] {1}".format( i, line)
                                                                                 for i, line in err_lines))
             logging.info("-" * 40)
             logging.info( msg)
@@ -403,7 +505,7 @@ def RunMain( options = None,
              **kwargs):
     u"""
     """
-    
+
     if args is None:
         args = []
 
@@ -413,7 +515,7 @@ def RunMain( options = None,
     if options.Check:
         _CheckPrerequisites()
         sys.exit( EXIT_OK)
-    
+
     ####################
     # work starts here #
     ####################
@@ -427,7 +529,7 @@ def RunMain( options = None,
                 elif os.path.isfile( fd):
                     os.remove( fd)
             logging.info("Deleted %s files/directories", len( files_or_dirs))
-    
+
     if OTHER_LOG_FILES:
         for lfile in OTHER_LOG_FILES:
             LOG_WATCHERS.append( LogTail( lfile))
@@ -437,9 +539,9 @@ def RunMain( options = None,
         Ly2Tex (options, args)
         Tex2PDF(options, args)
     finally:
-         CheckLogForErrors()
+         CheckLogForErrors( wdir = options.wdir)
     logging.info("=" * 40)
-    
+
 if __name__ == '__main__':
     if False:
         input("Connect to debugger?")

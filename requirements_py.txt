@@ -1,3 +1,4 @@
-# install via (from Admin CMD)
+# install via
 #   python -m pip install -r requirements_py.txt
-PyPDF2
+# (linux with externally managed python: python3 -m venv .venv && .venv/bin/pip install -r requirements_py.txt)
+pypdf

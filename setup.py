@@ -10,13 +10,14 @@ to run a check of the local installation::
 # -- python standard imports ---
 import logging
 import os
+import shutil
 import sys
 from optparse import OptionParser
 
 # -- pip ---
 
 # -- local imports ---
-from base import RunCMD, GetConfig, SaveConfig
+from base import RunCMD, GetConfig, SaveConfig, IS_WINDOWS
 from create_pdf import _CheckPrerequisites, _AddLilypondToPath, loggingSetup
 
 LOG_FILE = "setup.log"
@@ -26,11 +27,29 @@ LILYPOND_PATHS = [
     r"c:\Program Files\LilyPond\usr\bin",
     r"d:\Program Files (x86)\LilyPond\usr\bin",
     r"d:\Program Files\LilyPond\usr\bin",
+] if IS_WINDOWS else [
+    "/usr/bin",
+    "/usr/local/bin",
+    os.path.expanduser( "~/.local/bin"),
+    "/opt/lilypond/bin",
 ]
+LILYPOND_EXE = "lilypond.exe" if IS_WINDOWS else "lilypond"
+
 def FindLilypond( interactive = True):
     lily_paths = []
-    for p in LILYPOND_PATHS:
-        lily_exe = os.path.join( p, "lilypond.exe")
+    candidates = list( LILYPOND_PATHS)
+    # whatever is in PATH is a candidate as well
+    in_path = shutil.which( LILYPOND_EXE)
+    if in_path:
+        candidates.insert( 0, os.path.dirname( in_path))
+
+    seen = set()
+    for p in candidates:
+        p = os.path.normpath( p)
+        if p in seen:
+            continue
+        seen.add( p)
+        lily_exe = os.path.join( p, LILYPOND_EXE)
         if not os.path.exists( lily_exe):
             continue
 
@@ -45,19 +64,19 @@ def FindLilypond( interactive = True):
         except Exception as exc:
             # this exe doesn't work, just skip it
             pass
-    
+
     lily = None
 
     if len(lily_paths) == 1:
         [lily] = lily_paths
         logging.info( "Detected Lilypond with version=%s at %s", lily["version"], lily["exe_path"])
-    
+
     if len(lily_paths) > 1:
         # multiple found, let the user decide
         print("Detected multiple lilypond candidates:")
         for idx, _lily in enumerate( lily_paths, start = 1):
             print( f"  [{idx}] {_lily['exe_path']} at version {_lily['version']}")
-        
+
         while True:
             selected = input("Select lilypond: ")
             try:
@@ -72,7 +91,7 @@ def FindLilypond( interactive = True):
     if lily is None:
         logging.warning("No lilypond found.")
         return None
-    
+
     return lily["bin_path"]
 
 def InstallPyRequirements():
@@ -112,13 +131,13 @@ def RunMain( options = None,
              **kwargs):
     u"""
     """
-    
+
     if args is None:
         args = []
 
     # fetch and set parameters #
     options, args = ParseOptions(options, args, **kwargs)
-    
+
     ####################
     # work starts here #
     ####################
@@ -126,8 +145,9 @@ def RunMain( options = None,
         lily_path = FindLilypond( interactive = True)
 
         config = GetConfig()
-        config["lilypond"]["PATH_LILYPOND"] = lily_path
-        config["latex"]["CMD_PDFLATEX"] = "texify --pdf --batch"
+        config["lilypond"]["PATH_LILYPOND"] = lily_path or ""
+        # MiKTeX's texify takes care of multiple runs/index creation. On linux (TeX Live) create_pdf.py does that itself.
+        config["latex"]["CMD_PDFLATEX"] = "texify --pdf --batch" if IS_WINDOWS else "pdflatex"
 
     ##if options.InstallPyRequirements:
     ##    InstallPyRequirements()
@@ -135,7 +155,7 @@ def RunMain( options = None,
     if options.CheckPrerequisites or options.InitConfig:
         _AddLilypondToPath()
         _CheckPrerequisites()
-    
+
     if options.InitConfig:
         SaveConfig()
 
