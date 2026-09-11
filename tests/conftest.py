@@ -124,7 +124,3 @@ def minimal_book( tmp_path):
     """A copy of the minimal example book in a temporary directory (returns its path)."""
     return copy_book( os.path.join( DATA_DIR, "minimal_book"), tmp_path / "minimal_book")
 
-
-@pytest.fixture
-def maker_dir():
-    return MAKER_DIR
