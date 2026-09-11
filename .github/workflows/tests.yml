@@ -1,0 +1,95 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux:
+    name: Linux (python ${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install lilypond and TeX Live
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lilypond texlive-latex-base
+          lilypond --version | head -1
+          lilypond-book --version
+          pdflatex --version | head -1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: requirements_dev.txt
+
+      - name: Install python requirements
+        run: python -m pip install -r requirements_dev.txt
+
+      - name: Check prerequisites
+        run: ./lilybook.sh --check
+        working-directory: tests/data/minimal_book
+
+      - name: Run tests
+        run: python -m pytest -ra --junitxml=pytest-results.xml | tee pytest-output.txt
+
+      - name: Fail if integration tests were skipped
+        run: |
+          if grep -q "SKIPPED" pytest-output.txt; then
+            echo "::error::Some tests were skipped - the toolchain is probably incomplete."
+            exit 1
+          fi
+
+      - name: Upload results and generated log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-results-linux-py${{ matrix.python }}
+          path: |
+            pytest-results.xml
+            pytest-output.txt
+            tests/data/minimal_book/create_pdf.log
+          if-no-files-found: ignore
+
+  # Windows is the original platform. MiKTeX installs missing packages on the fly, which makes this
+  # job slow (several minutes); it is therefore allowed to fail without blocking the branch.
+  windows:
+    name: Windows (experimental)
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install lilypond and MiKTeX
+        shell: pwsh
+        run: |
+          choco install -y --no-progress lilypond miktex
+          # make the tools of this run visible to later steps
+          "C:\Program Files (x86)\LilyPond\usr\bin"      | Out-File -Append $env:GITHUB_PATH
+          "C:\Program Files\LilyPond\usr\bin"            | Out-File -Append $env:GITHUB_PATH
+          "C:\Program Files\MiKTeX\miktex\bin\x64"       | Out-File -Append $env:GITHUB_PATH
+          "$env:LOCALAPPDATA\Programs\MiKTeX\miktex\bin\x64" | Out-File -Append $env:GITHUB_PATH
+
+      - name: Configure MiKTeX to install packages automatically
+        shell: pwsh
+        run: |
+          initexmf --set-config-value "[MPM]AutoInstall=1"
+          miktex packages update-package-database
+          # the minimal test book only needs the base packages
+          miktex packages install makeindex
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install python requirements
+        run: python -m pip install -r requirements_dev.txt
+
+      - name: Run tests
+        run: python -m pytest -ra
