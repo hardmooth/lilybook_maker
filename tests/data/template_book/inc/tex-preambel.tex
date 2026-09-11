@@ -1,0 +1,159 @@
+% LaTeX-Präambel für TeX + Lilypond
+% (LaTeX preamble for TeX + Lilypond - shared macros and packages of the whole book)
+% @author: Hartmut Leister <hartmut.leister@gmail.com>
+
+% ---------------------------------------------------------
+% benötigte Variablen/Pakete - these have to be defined in the main .lytex file BEFORE
+% including this preamble:
+%
+% \usepackage{ifthen} % wird für boolsche Flags benötigt
+%
+% % Titel zur Anzeige im Blattkopf
+% \newcommand{\shortHead}{My title}
+% % Datum zur Anzeige
+% \newcommand{\theDate}{\today{}}
+% % Author des Dokuments
+% \newcommand{\theAuthor}{Hartmut Leister}
+% % Logo-Dateien (nichts eintragen -> kein Logo)
+% \newcommand{\logoSmallFileName}{logo.pdf}
+% \newcommand{\logoLargeFileName}{logo.pdf}
+% % Flag, ob Kopf- oder Fußzeilen angezeigt werden sollen (true, false)
+% \newboolean{ShowHeader}
+% \setboolean{ShowHeader}{false}
+% ---------------------------------------------------------
+
+\usepackage{ifxetex}
+\ifxetex
+    %xetex specific stuff
+    \usepackage{xunicode,fontspec,xltxtra}
+    \usepackage{relsize}
+    \usepackage[ngerman]{babel}
+
+    \setmainfont{GFS Didot}
+    \setsansfont{Umpush}
+\else
+    % pdflatex specific configuration
+    \usepackage[T1]{fontenc}
+    \usepackage[utf8]{inputenc}
+    \usepackage{mathptmx}%Times
+    % Schriftartenfamile Linux Libertine + Biolinum
+    \usepackage{libertine}
+    \usepackage{german}
+\fi
+
+\usepackage{geometry}
+% keep that in sync with scores/default.ly -> \paper
+\geometry{  a5paper,
+            left   = 1.0cm,
+            right  = 1.0cm,
+            top    = 2.0cm,
+            bottom = 1.5cm,
+            headheight = 25pt,
+            heightrounded
+            }
+\pagestyle{empty}
+\usepackage{graphicx}
+\usepackage{wrapfig}
+
+% symbols (e.g. \Cross)
+\usepackage{marvosym}
+
+% URLs and hyperrefs
+\usepackage[breaklinks]{hyperref}
+\usepackage{url}
+
+\hypersetup{pdfborder=0 0 0}
+
+\hypersetup{
+%pdfpagemode = FullScreen,
+pdfpagelayout = TwoPageRight,
+baseurl = {},
+pdftitle = {\shortHead},
+pdfcreator = {TeX},
+pdfproducer = {pdfTeX},
+pdfauthor = {\theAuthor},
+pdfsubject = {\shortHead},
+pdfkeywords = {\theDate, \shortHead}
+}
+
+\usepackage{hyphenat}
+
+\usepackage{mathtools}
+% ---------------------------------------------------------
+%  index generation
+\usepackage{makeidx}
+\makeindex
+\renewcommand\indexname{Inhaltsverzeichnis}
+
+% ---------------------------------------------------------
+\usepackage{fancyhdr}
+\ifShowHeader
+    \pagestyle{fancy}
+    \fancyhead{} % clear all header fields
+    \fancyhead[LE]{\textsc{\shortHead}}
+    % add small logo to header
+    % height must be less than headheight above at geometry or we'll have mismatching heights
+    \fancyhead[RO]{\includegraphics[height=20pt]{\logoSmallFileName}}
+    \fancyfoot{} % clear all footer fields
+    \fancyfoot[LE,RO]{\thepage}
+    \fancyfoot[RE]{\theDate}
+    \renewcommand{\headrulewidth}{0.4pt}
+    \renewcommand{\footrulewidth}{0.4pt}
+\fi
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{8pt}
+
+\usepackage{framed,color}
+\definecolor{shadecolor}{rgb}{0.95,0.95,0.95}
+
+% remove numberings from chapter, section, subsection
+% (using just chapter* would not add them to the TOC
+% (see https://tex.stackexchange.com/a/30202/19668)
+\renewcommand{\thesection}{}
+\renewcommand{\thechapter}{}
+
+%\addsubsec
+\makeatletter
+\newcommand*\addsubsec{\secdef\@addsubsec\@saddsubsec}
+\newcommand*{\@addsubsec}{}
+\def\@addsubsec[#1]#2{\subsection*{#2}\addcontentsline{toc}{subsection}{#1}
+  \if@twoside\ifx\@mkboth\markboth\markright{#1}\fi\fi
+}
+\newcommand*{\@saddsubsec}[1]{\subsection*{#1}\@mkboth{}{}}
+\makeatother
+
+% Aussehen von section, subsection
+% bei Layout müssen drei Befehle: Schriftstärke, Serifen/keine, Größe
+\makeatletter
+\renewcommand\section{\@startsection
+{section}{1}{0mm}%           % name, ebene, einzug
+{1\baselineskip}%            % vor-abstand
+{1\baselineskip}%            % nach-abstand
+{\bfseries\sffamily\Large}%  % layout: fett, sans-serif, groß
+}
+\makeatother
+\makeatletter
+\renewcommand\subsection{\@startsection
+{subsection}{2}{0mm}%        % name, ebene, einzug
+{0\baselineskip}%            % vor-abstand
+{0.1\baselineskip}%          % nach-abstand
+{\bfseries\sffamily\large}%  % layout
+}
+\makeatother
+
+% ---------------------------------------------------------
+% song macros
+\newcommand{\Lied}[1]
+{
+    % Layout für Lied (ohne Liednummer)
+    \par
+    \textbf{
+        \large
+        #1
+    }
+}
+\newcommand{\LiedNummer}[2]{
+    % Layout für Lied mit Angabe der Liednummer
+    \Lied{#1}{\hfill (#2)}
+}

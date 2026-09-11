@@ -1,0 +1,89 @@
+\documentclass[a5paper,10pt,twoside]{book}
+
+% ---------------------------------------------------------
+% lokale Variablen (local variables, used by inc/tex-preambel.tex)
+\usepackage{ifthen} % wird für boolsche Flags benötigt
+
+% Titel zur Anzeige im Blattkopf (short title for the page header)
+\newcommand{\shortHead}{Short title}
+% Datum zur Anzeige
+\newcommand{\theDate}{\today{}}
+% Author des Dokuments
+\newcommand{\theAuthor}{Hartmut Leister}
+% Logo-Dateien in inc/ (nichts eintragen -> kein Logo)
+\newcommand{\logoSmallFileName}{logo.pdf}
+\newcommand{\logoLargeFileName}{logo.pdf}
+% Flag, ob Kopf- oder Fußzeilen angezeigt werden sollen (true, false)
+\newboolean{ShowHeader}
+\setboolean{ShowHeader}{true}
+% ---------------------------------------------------------
+% Einbinden des allgemeinen LaTeX-Prassels (found via include directory inc/)
+\input{tex-preambel.tex}
+
+% remove empty pages after title and TOC
+% https://tex.stackexchange.com/a/334126/19668
+\let\cleardoublepage=\clearpage
+
+% =========================================================
+\begin{document}
+% =========================================================
+% Startseite ohne Kopf- oder Fußzeile
+\thispagestyle{empty}
+
+% Hinweis auf die Quelle (link to the repository)
+\footnotesize
+\url{https://github.com/hardmooth/lilybook_template}
+
+% Titel des Buches
+\begin{center}
+    \Huge
+    \bfseries
+    Liederbuch \linebreak
+    Vorlage
+    \bigskip
+
+    \includegraphics[width=0.7\textwidth]{\logoLargeFileName}
+\end{center}
+% optional: Deckblatt auf eigene Seite (auskommentieren)
+%\newpage
+
+% ---------------------------------------------------------
+% Inhaltsverzeichnis
+\tableofcontents
+% optional: print index (needs \index{...} entries)
+% \printindex
+\vfill
+\pagebreak
+
+% ---------------------------------------------------------
+\input{intro.tex}
+\pagebreak
+
+% ---------------------------------------------------------
+% Now the songs will start.
+% Each song: one line for the table of contents, one \lilypondfile with the score from scores/
+% -------------------------------------
+\chapter*{Erstes Kapitel}
+\addcontentsline{toc}{chapter}{Erstes Kapitel}
+
+\addcontentsline{toc}{section}{My Sample Song}
+\lilypondfile{my_sample_song.ly}
+\pagebreak
+
+% -------------------------------------
+\chapter*{Zweites Kapitel}
+\addcontentsline{toc}{chapter}{Zweites Kapitel}
+
+\addcontentsline{toc}{section}{My Sample Song (nochmal)}
+\lilypondfile{my_sample_song.ly}
+
+% optional: text and references without a score
+\vfill
+\hrulefill
+\LiedNummer{Simply some reference}{somewhere}
+\Lied{We've done it}
+
+Copy this and get started yourself!
+
+% =========================================================
+\end{document}

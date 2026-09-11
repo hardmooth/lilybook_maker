@@ -100,12 +100,17 @@ The integration tests build the minimal example book in `tests/data/minimal_book
 if lilypond, lilypond-book or pdflatex are not installed.
 
 `tests/test_books.py` additionally builds real books with every command line option
-(see issue #4): by default the sibling directories `../lilybook_template` and
-`../liederbuch_advent_weihnachten` of this checkout, if they exist. Other books can be given via the
-environment variable `LILYBOOK_BOOKS` (directories separated by `:`, on Windows `;`):
+(see issue #4): by default `tests/data/template_book` (a snapshot of
+https://github.com/hardmooth/lilybook_template) and the sibling directories `../lilybook_template`
+and `../liederbuch_advent_weihnachten` of this checkout, if they exist. Other books can be given via
+the environment variable `LILYBOOK_BOOKS` (directories separated by `:`, on Windows `;`):
 
     LILYBOOK_BOOKS=/path/to/my_book:/path/to/other_book python -m pytest tests/test_books.py
 
 A book is skipped (with the reason printed by `-ra`) if its directory or one of the LaTeX packages it
 uses is missing. The GitHub Actions workflow (`.github/workflows/tests.yml`) runs all of this against
-the lilybook_template repository on every push.
+`tests/data/template_book` on every push (the template repository itself is not accessible from the
+runner). To refresh the snapshot from a lilybook_template checkout:
+
+    rm -rf tests/data/template_book && mkdir tests/data/template_book
+    (cd ../lilybook_template && git ls-files -z) | (cd ../lilybook_template && xargs -0 -I{} cp --parents {} "$OLDPWD/tests/data/template_book/")

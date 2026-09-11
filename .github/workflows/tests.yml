@@ -4,11 +4,6 @@ on:
   push:
   pull_request:
 
-env:
-  # branch/tag of https://github.com/hardmooth/lilybook_template to build in the tests
-  # TODO: switch to "master" once align_with_liederbuch is merged
-  LILYBOOK_TEMPLATE_REF: align_with_liederbuch
-
 jobs:
   linux:
     name: Linux (python ${{ matrix.python }})
@@ -20,15 +15,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Checkout lilybook_template
-        uses: actions/checkout@v4
-        with:
-          repository: hardmooth/lilybook_template
-          ref: ${{ env.LILYBOOK_TEMPLATE_REF }}
-          path: books/lilybook_template
-
       - name: Install lilypond and TeX Live
-        # texlive-latex-base suffices for tests/data/minimal_book; the template additionally needs
+        # texlive-latex-base suffices for tests/data/minimal_book; tests/data/template_book additionally needs
         # koma-script/pdfpages (latex-recommended), framed/wrapfig/relsize/hyphenat/mathtools (latex-extra),
         # libertine/marvosym (fonts-recommended, fonts-extra) and german (lang-german)
         run: |
@@ -52,11 +40,11 @@ jobs:
 
       - name: Check prerequisites
         run: bash "$GITHUB_WORKSPACE/lilybook.sh" --check
-        working-directory: books/lilybook_template
+        working-directory: tests/data/template_book
 
       - name: Run tests
         env:
-          LILYBOOK_BOOKS: ${{ github.workspace }}/books/lilybook_template
+          LILYBOOK_BOOKS: ${{ github.workspace }}/tests/data/template_book
         run: python -m pytest -ra --basetemp=pytest-tmp --junitxml=pytest-results.xml | tee pytest-output.txt
 
       - name: Fail if tests were skipped
@@ -86,13 +74,6 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-
-      - name: Checkout lilybook_template
-        uses: actions/checkout@v4
-        with:
-          repository: hardmooth/lilybook_template
-          ref: ${{ env.LILYBOOK_TEMPLATE_REF }}
-          path: books/lilybook_template
 
       - name: Install lilypond and MiKTeX
         shell: pwsh
@@ -139,12 +120,12 @@ jobs:
       - name: Check prerequisites
         shell: pwsh
         run: python "$env:GITHUB_WORKSPACE\create_pdf.py" --check
-        working-directory: books/lilybook_template
+        working-directory: tests/data/template_book
 
       - name: Run tests
         shell: pwsh
         env:
-          LILYBOOK_BOOKS: ${{ github.workspace }}\books\lilybook_template
+          LILYBOOK_BOOKS: ${{ github.workspace }}\tests\data\template_book
         run: python -m pytest -ra --basetemp=pytest-tmp | Tee-Object -FilePath pytest-output.txt
 
       - name: Fail if tests were skipped

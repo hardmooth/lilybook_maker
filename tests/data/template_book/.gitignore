@@ -1,0 +1,11 @@
+*.log
+*.pyc
+__pycache__/
+# temporary build files
+out/*
+_gitshort
+# generated PDFs (single scores and the book itself)
+scores/*.pdf
+scores/*.mid
+document.pdf
+document-booklet.pdf

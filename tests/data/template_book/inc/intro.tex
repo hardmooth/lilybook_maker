@@ -1,0 +1,34 @@
+% Vorwort / Introduction / Disclaimer
+\chapter*{Vorwort}
+\addcontentsline{toc}{chapter}{Vorwort}
+
+% Motivation - replace with your own text
+Dieses Liederbuch wurde mit Lilypond und \LaTeX{} gesetzt.
+Es soll folgende Anforderungen erfüllen:
+\begin{itemize}
+    \item ein gut lesbares Notenbild,
+    \item Begleitakkorde, spielbar für Gelegenheitspianisten oder \mbox{-gitarristen},
+    \item einfach druckbar (Standard A4 Drucker, Klammerheftung).
+\end{itemize}
+
+\vfill
+
+Ein Hinweis für alle Begleitmusiker:
+Bei den Akkorden wird die semideutsche Schreibweise verwendet -- ihr werdet also B$\flat$ und H finden.
+
+\hrulefill
+
+% Copyright / disclaimer - adapt to your book
+Dieses Liederbuch ist \textbf{nicht zur Veröffentlichung} bestimmt, sondern ausschließlich für den begrenzten, häuslichen Gebrauch.
+
+\smallskip
+
+Mitgestaltung gern unter {\small \url{https://github.com/hardmooth/lilybook_template}}
+
+% Build info: compilation date and short git SHA.
+% build.cmd / build.sh write the SHA to the file _gitshort; if it is missing "unknown" is shown.
+\newcommand{\buildhash}{%
+    \IfFileExists{_gitshort}{\input{_gitshort}}{unknown}
+}
+\par\smallskip
+\noindent\textit{Stand: \today{} -- Commit: \texttt{\buildhash}}

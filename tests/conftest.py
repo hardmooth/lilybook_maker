@@ -55,9 +55,11 @@ def copy_book( src_dir, dst_dir):
 # real books (lilybook_template, liederbuch, ...)
 
 #: environment variable with a list (os.pathsep separated) of book directories to test.
-#: If unset, sibling directories of lilybook_maker are used, if existing.
+#: If unset, the template snapshot in tests/data and sibling directories of lilybook_maker are used, if existing.
 BOOKS_ENV = "LILYBOOK_BOOKS"
 DEFAULT_BOOK_DIRS = [
+    # snapshot of https://github.com/hardmooth/lilybook_template (see README: running the tests)
+    os.path.join( DATA_DIR, "template_book"),
     os.path.join( os.path.dirname( MAKER_DIR), "lilybook_template"),
     os.path.join( os.path.dirname( MAKER_DIR), "liederbuch_advent_weihnachten"),
 ]
