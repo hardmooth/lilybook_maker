@@ -21,9 +21,14 @@ if MAKER_DIR not in sys.path:
 def tool_available( *tools):
     return all( shutil.which( tool) for tool in tools)
 
+def toolchain_available():
+    """lilypond, lilypond-book and pdflatex are usable (lilypond-book is looked up the way create_pdf does it)"""
+    import create_pdf
+    return bool( tool_available( "lilypond", "pdflatex") and create_pdf.PATH_LILYPOND_BOOK)
+
 #: marker for tests that need the full toolchain (lilypond-book + pdflatex)
 requires_toolchain = pytest.mark.skipif(
-    not tool_available( "lilypond", "lilypond-book", "pdflatex"),
+    not toolchain_available(),
     reason = "lilypond, lilypond-book and pdflatex are required")
 
 
@@ -102,7 +107,7 @@ def book( request, tmp_path_factory):
     name, src = request.param
     if not os.path.isdir( src):
         pytest.skip( "book directory '{}' not found".format( src))
-    if not tool_available( "lilypond", "lilypond-book", "pdflatex"):
+    if not toolchain_available():
         pytest.skip( "lilypond, lilypond-book and pdflatex are required")
     missing = missing_latex_packages( src)
     if missing:

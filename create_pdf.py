@@ -64,32 +64,46 @@ PATH_LILYPOND = GetConfig()["lilypond"]["PATH_LILYPOND"].strip()
 def _FindLilypondBook():
     """
     find a valid lilypond-book script file
-    (upto version lilypond 20.* it was "lilypond-book.py", somewhen after only "lilypond-book")
+    (upto version lilypond 20.* it was "lilypond-book.py", somewhen after only "lilypond-book";
+    the windows bundles ship "lilypond-book.py" next to lilypond.exe)
     """
-    candidates = []
+    search_dirs = []
     if PATH_LILYPOND:
-        candidates += [ os.path.join( PATH_LILYPOND, "lilypond-book.py"),
-                        os.path.join( PATH_LILYPOND, "lilypond-book")]
-    found_in_path = shutil.which( "lilypond-book")
-    if found_in_path:
-        candidates.append( found_in_path)
+        search_dirs.append( PATH_LILYPOND)
+    lilypond_exe = shutil.which( "lilypond")
+    if lilypond_exe:
+        search_dirs.append( os.path.dirname( os.path.realpath( lilypond_exe)))
 
-    return next( (p for p in candidates if os.path.exists(p)), None)
+    for search_dir in search_dirs:
+        for name in ( "lilypond-book.py", "lilypond-book"):
+            candidate = os.path.join( search_dir, name)
+            if os.path.isfile( candidate):
+                return candidate
+
+    # shutil.which only finds "lilypond-book.py" on windows if .PY is in PATHEXT - so try both names
+    for name in ( "lilypond-book", "lilypond-book.py"):
+        candidate = shutil.which( name)
+        if candidate:
+            return candidate
+
+    return None
 
 PATH_LILYPOND_BOOK = _FindLilypondBook()
 
 def _BuildLilypondBookCmd():
     """
-    Lilypond-book is a python script. On Windows (older lilypond bundles) it has to be run with the
-    python interpreter shipped with lilypond. On Linux (and newer bundles) it is directly executable.
+    Lilypond-book is a python script. On Windows it has to be run with a python interpreter -
+    preferably the one shipped with lilypond (next to lilypond-book.py). On Linux it is directly executable.
     """
     if PATH_LILYPOND_BOOK is None:
         return [ "lilypond-book"]   # let the prerequisites check report a helpful error
 
     if IS_WINDOWS:
-        lily_python = os.path.join( PATH_LILYPOND, "python.exe")
-        if os.path.exists( lily_python):
+        lily_python = os.path.join( os.path.dirname( PATH_LILYPOND_BOOK), "python.exe")
+        if os.path.isfile( lily_python):
             return [ lily_python, PATH_LILYPOND_BOOK]
+        if PATH_LILYPOND_BOOK.lower().endswith( ".py"):
+            return [ sys.executable, PATH_LILYPOND_BOOK]
 
     return [ PATH_LILYPOND_BOOK]
 
@@ -425,7 +439,10 @@ def Tex2PDF(options, args):
         if IS_WINDOWS:
             # run pdflatex / texify
             # (texify automaticaly creates index files and thus allows for an index)
-            latex_args = [f"--include-directory={_dir}" for _dir in options.include_dirs ] + [ options.tex_file]
+            latex_args = [f"--include-directory={_dir}" for _dir in options.include_dirs ]
+            if not PDFLATEX_IS_WRAPPER:
+                latex_args.append( "-interaction=nonstopmode")
+            latex_args.append( options.tex_file)
             cmd = SplitCmd( CMD_PDFLATEX) + latex_args
             RunCMD( cmd, write_to_log = True, raise_on_error=options.Strict, timeout_sec = 15 * 60)
         else:
