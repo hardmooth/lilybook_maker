@@ -6,15 +6,13 @@ The integration tests build the minimal example book in tests/data/minimal_book 
 lilypond, lilypond-book and pdflatex to be installed. They are skipped otherwise.
 """
 import os
-import subprocess
-import sys
 
 import pytest
 
-from conftest import requires_toolchain
+from conftest import requires_toolchain, run_create_pdf, pdf_page_count
 
 import create_pdf
-from base import EXIT_OK, EXIT_BAD_PARAMETERS
+from base import EXIT_OK, EXIT_BAD_PARAMETERS, EXIT_BAD_PREREQUISITES
 
 
 # ------------------------------------------------------------------------------------------------
@@ -68,18 +66,6 @@ def test_log_file_pattern_matches_absolute_paths():
 
 # ------------------------------------------------------------------------------------------------
 # integration tests
-
-def run_create_pdf( book_dir, *args, timeout = 600):
-    """runs create_pdf.py inside book_dir and returns the CompletedProcess"""
-    script = os.path.join( os.path.dirname( os.path.dirname( os.path.abspath( __file__))), "create_pdf.py")
-    return subprocess.run( [ sys.executable, script] + list( args),
-                           cwd = str( book_dir), capture_output = True, text = True, timeout = timeout)
-
-
-def pdf_page_count( pdf_path):
-    import pypdf
-    return len( pypdf.PdfReader( str( pdf_path)).pages)
-
 
 @requires_toolchain
 def test_check_prerequisites( minimal_book):
@@ -160,6 +146,16 @@ def test_strict_build_fails_on_latex_error( minimal_book):
     result = run_create_pdf( minimal_book, "--strict", "minimal_book.lytex")
     assert result.returncode != EXIT_OK
     assert "LaTeX reported" in result.stdout
+
+
+@requires_toolchain
+def test_strict_build_fails_on_invalid_encoding( minimal_book):
+    (minimal_book / "inc" / "latin1.tex").write_bytes( "% äöü".encode( "latin-1"))
+
+    result = run_create_pdf( minimal_book, "--strict", "minimal_book.lytex")
+    assert result.returncode == EXIT_BAD_PREREQUISITES
+    assert "Invalidly encoded file" in result.stdout
+    assert not (minimal_book / "minimal_book.pdf").exists()
 
 
 def test_no_lytex_file_fails( tmp_path):

@@ -324,8 +324,11 @@ def ParseOptions( options = None, args = None, **kwargs):
     # check encoding of files in include directories.
     # Any included file not correctly encoded in UTF8 will most likely break lilypond down.
     # So it's better to check this now, so authors have a pointer what broke where.
-    for inc_dir in options.include_dirs:
-        CheckEncoding( inc_dir)
+    encoding_valid = all( [ CheckEncoding( inc_dir) for inc_dir in options.include_dirs])
+    if not encoding_valid:
+        logging.error("Invalidly encoded files found - lilypond-book will most likely fail. Convert them to UTF-8 first.")
+        if options.Strict:
+            sys.exit( EXIT_BAD_PREREQUISITES)
 
     if os.path.exists( os.path.join( "check.py")):
         sys.path.append( os.getcwd())
