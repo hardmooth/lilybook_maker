@@ -51,7 +51,7 @@ jobs:
         run: python -m pip install -r requirements_dev.txt
 
       - name: Check prerequisites
-        run: ./lilybook.sh --check
+        run: bash "$GITHUB_WORKSPACE/lilybook.sh" --check
         working-directory: books/lilybook_template
 
       - name: Run tests
