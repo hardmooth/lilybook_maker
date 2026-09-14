@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# lilybook - build a Lilypond/LaTeX songbook in the current directory.
+#
+# usage (inside a book directory):
+#   lilybook [target ...] [VARIABLE=value ...]      e.g.  lilybook          lilybook booklet STRICT=1
+#   lilybook help                                   lists the targets
+#
+# Setup: put the lilybook_maker directory on your PATH (Linux, WSL, macOS), e.g. in ~/.bashrc:
+#   export PATH="$PATH:$HOME/lilybook_maker"
+# All build logic lives in lilybook.mk next to this script; books contain only their sources.
+# Output is also written to lilybook.log in the book directory.
+
+set -uo pipefail
+
+MAKER_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+
+if ! command -v make >/dev/null; then
+    echo "lilybook: GNU make not found (Debian/Ubuntu: sudo apt install make)" >&2
+    exit 2
+fi
+
+make -f "$MAKER_DIR/lilybook.mk" --no-print-directory "$@" 2>&1 | tee lilybook.log
+exit "${PIPESTATUS[0]}"

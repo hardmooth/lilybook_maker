@@ -23,11 +23,10 @@ You can fork/copy this template to write your own songbook.
 | scores/_template.ly     | template for a new song - copy and fill in                                        |
 | scores/my_sample_song.ly| example song                                                                      |
 | check.py                | book specific checks, run automatically by lilybook_maker before each build       |
-| build.cmd / build.sh    | builds the book as document.pdf (Windows / Linux)                                 |
-| build_full.cmd / .sh    | full rebuild, additionally writes document-booklet.pdf for printing               |
 | out/                    | temporary folder, used by lilypond-book and LaTeX (not versioned)                 |
-| document.pdf            | created PDF, A5 (after building, not versioned)                                   |
-| document-booklet.pdf    | created booklet PDF, A4 landscape, 2 pages per sheet (after build_full)           |
+| document.pdf            | created PDF, A5 (`lilybook`, not versioned)                                       |
+| document-booklet.pdf    | created booklet PDF, A4 landscape, 2 pages per sheet (`lilybook booklet`)         |
+| lilybook.log            | output of the last build                                                          |
 
 # Building
 
@@ -48,37 +47,33 @@ Added songs have to be linked in `document.lytex`:
 To build the whole book, you'll need either of the following:
 
 * run lilypond-book and then LaTeX on `document.lytex` yourself, or
-* use the lilybook_maker, which takes care of that:
+* use the lilybook_maker, which takes care of that (inside this directory):
 
-      build.cmd          (Windows: double click)
-      ./build.sh         (Linux)
-      build_full.cmd / ./build_full.sh   (full rebuild + booklet for printing)
+      lilybook            # document.pdf
+      lilybook booklet    # additionally document-booklet.pdf for printing
+      lilybook check      # verify tools, LaTeX packages and encodings
+      lilybook help       # all targets and options
 
-  All further options are forwarded to lilybook_maker, e.g. `./build.sh --strict`.
-
-The result is `document.pdf` (or the errors are printed and written to `create_pdf.log`).
+The result is `document.pdf` (or the errors are printed and written to `lilybook.log`).
 
 ## Setup with lilybook_maker
 
 This template and lilybook_maker are developed in bundle to ease the creation of the songbook PDF.
 
-   1. install Lilypond, LaTeX and python (see the lilybook_maker README for your OS)
-   2. clone https://github.com/hardmooth/lilybook_maker somewhere centrally
-   3. add the cloned lilybook_maker folder to your PATH
-      (Windows: https://helpdeskgeek.com/windows-10/add-windows-path-environment-variable/ ,
-       Linux: `export PATH="$PATH:/path/to/lilybook_maker"` in `~/.bashrc`, or set `LILYBOOK_MAKER=/path/to/lilybook_maker`)
-   4. fork/copy this template repository
+   1. install the tools and clone https://github.com/hardmooth/lilybook_maker as described in its README
+      (Linux natively, Windows inside WSL) and put it on your PATH
+   2. fork/copy this template repository
 
       **WARNING**: Do not simply clone this template and work on it. You'll later havoc your songbook with git-pull.
-   5. run `build.cmd` / `./build.sh` in the songbook folder to create a PDF
-   6. write your songbook and build the PDF (see above)
+   3. run `lilybook` in the songbook folder to create a PDF
+   4. write your songbook and build the PDF (see above)
 
 ## LaTeX packages
 
-The preamble uses (Debian/Ubuntu package names): koma-script/pdfpages (`texlive-latex-recommended`),
+The preamble uses (Debian/Ubuntu package names): pdfpages (`texlive-latex-recommended`),
 framed, wrapfig, relsize, hyphenat, mathtools (`texlive-latex-extra`), libertine, marvosym
 (`texlive-fonts-recommended`, `texlive-fonts-extra`) and german (`texlive-lang-german`).
-On Windows MiKTeX installs missing packages on the fly.
+`lilybook check` lists what is missing.
 
 # Printing
 

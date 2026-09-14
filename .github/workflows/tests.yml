@@ -6,40 +6,33 @@ on:
 
 jobs:
   linux:
-    name: Linux (python ${{ matrix.python }})
+    name: Linux
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        python: ["3.10", "3.12"]
     steps:
       - uses: actions/checkout@v4
 
       - name: Install lilypond and TeX Live
-        # texlive-latex-base suffices for tests/data/minimal_book; tests/data/template_book additionally needs
-        # koma-script/pdfpages (latex-recommended), framed/wrapfig/relsize/hyphenat/mathtools (latex-extra),
+        # texlive-latex-base + pdfpages (latex-recommended) suffice for tests/data/minimal_book;
+        # tests/data/template_book additionally needs framed/wrapfig/relsize/hyphenat/mathtools (latex-extra),
         # libertine/marvosym (fonts-recommended, fonts-extra) and german (lang-german)
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            lilypond \
+            make lilypond latexmk poppler-utils \
             texlive-latex-base texlive-latex-recommended texlive-latex-extra \
             texlive-fonts-recommended texlive-fonts-extra texlive-lang-german
-          lilypond --version | head -1
-          lilypond-book --version
-          pdflatex --version | head -1
 
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python }}
+          python-version: "3.12"
           cache: pip
           cache-dependency-path: requirements_dev.txt
 
-      - name: Install python requirements
+      - name: Install test requirements
         run: python -m pip install -r requirements_dev.txt
 
-      - name: Check prerequisites
-        run: bash "$GITHUB_WORKSPACE/lilybook.sh" --check
+      - name: lilybook check on the template snapshot
+        run: "$GITHUB_WORKSPACE/lilybook" check
         working-directory: tests/data/template_book
 
       - name: Run tests
@@ -58,91 +51,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pytest-results-linux-py${{ matrix.python }}
+          name: pytest-results
           path: |
             pytest-results.xml
             pytest-output.txt
-            pytest-tmp/**/create_pdf.log
-            pytest-tmp/**/document*.pdf
-          if-no-files-found: ignore
-
-  # Windows is the original platform. MiKTeX installs missing packages on the fly, which makes this
-  # job slow (several minutes); it is therefore allowed to fail without blocking the branch.
-  windows:
-    name: Windows (experimental)
-    runs-on: windows-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install lilypond and MiKTeX
-        shell: pwsh
-        run: |
-          choco install -y --no-progress lilypond miktex
-
-      - name: Locate tools and add them to PATH
-        shell: pwsh
-        run: |
-          # chocolatey unpacks lilypond below its lib directory (and creates shims in C:\ProgramData\chocolatey\bin,
-          # which hide the location of lilypond-book.py) - so find the real bin directories
-          $lily = Get-ChildItem -Path 'C:\ProgramData\chocolatey\lib\lilypond', 'C:\Program Files (x86)\LilyPond', 'C:\Program Files\LilyPond' `
-                    -Recurse -Filter lilypond.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $lily) { throw "lilypond.exe not found" }
-          Write-Host "lilypond:      $($lily.FullName)"
-          Get-ChildItem $lily.DirectoryName -Filter 'lilypond-book*' | ForEach-Object { Write-Host "lilypond-book: $($_.FullName)" }
-          Get-ChildItem $lily.DirectoryName -Filter 'python*'        | ForEach-Object { Write-Host "python:        $($_.FullName)" }
-          $lily.DirectoryName | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
-
-          $latex = Get-ChildItem -Path 'C:\Program Files\MiKTeX', "$env:LOCALAPPDATA\Programs\MiKTeX", 'C:\ProgramData\chocolatey\lib\miktex' `
-                     -Recurse -Filter pdflatex.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $latex) { throw "pdflatex.exe not found" }
-          Write-Host "pdflatex:      $($latex.FullName)"
-          $latex.DirectoryName | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
-
-      - name: Configure MiKTeX to install packages automatically
-        shell: pwsh
-        run: |
-          # try both the admin (system wide install) and the user configuration
-          initexmf --admin --set-config-value "[MPM]AutoInstall=1"; if ($LASTEXITCODE -ne 0) { Write-Host "admin config failed (rc=$LASTEXITCODE)" }
-          initexmf --set-config-value "[MPM]AutoInstall=1";         if ($LASTEXITCODE -ne 0) { Write-Host "user config failed (rc=$LASTEXITCODE)" }
-          miktex --admin packages update-package-database;          if ($LASTEXITCODE -ne 0) { Write-Host "admin package db update failed (rc=$LASTEXITCODE)" }
-          miktex --admin packages install makeindex;                if ($LASTEXITCODE -ne 0) { Write-Host "makeindex install failed (rc=$LASTEXITCODE)" }
-          lilypond --version | Select-Object -First 1
-          pdflatex --version | Select-Object -First 1
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install python requirements
-        run: python -m pip install -r requirements_dev.txt
-
-      - name: Check prerequisites
-        shell: pwsh
-        run: python "$env:GITHUB_WORKSPACE\create_pdf.py" --check
-        working-directory: tests/data/template_book
-
-      - name: Run tests
-        shell: pwsh
-        env:
-          LILYBOOK_BOOKS: ${{ github.workspace }}\tests\data\template_book
-        run: python -m pytest -ra --basetemp=pytest-tmp | Tee-Object -FilePath pytest-output.txt
-
-      - name: Fail if tests were skipped
-        shell: pwsh
-        run: |
-          if (Select-String -Path pytest-output.txt -Pattern "SKIPPED" -Quiet) {
-            Write-Host "::error::Some tests were skipped - the toolchain or LaTeX packages are probably incomplete."
-            exit 1
-          }
-
-      - name: Upload results, logs and built PDFs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pytest-results-windows
-          path: |
-            pytest-output.txt
-            pytest-tmp/**/create_pdf.log
+            pytest-tmp/**/lilybook.log
             pytest-tmp/**/document*.pdf
           if-no-files-found: ignore

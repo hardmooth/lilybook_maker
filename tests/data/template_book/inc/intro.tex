@@ -26,7 +26,7 @@ Dieses Liederbuch ist \textbf{nicht zur Veröffentlichung} bestimmt, sondern aus
 Mitgestaltung gern unter {\small \url{https://github.com/hardmooth/lilybook_template}}
 
 % Build info: compilation date and short git SHA.
-% build.cmd / build.sh write the SHA to the file _gitshort; if it is missing "unknown" is shown.
+% lilybook writes the SHA to the file _gitshort before each build; if it is missing "unknown" is shown.
 \newcommand{\buildhash}{%
     \IfFileExists{_gitshort}{\input{_gitshort}}{unknown}
 }

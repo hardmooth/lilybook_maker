@@ -1,4 +1,4 @@
-# development requirements (in addition to requirements_py.txt)
-#   python -m pip install -r requirements_dev.txt
--r requirements_py.txt
+# development/test requirements
+#   python3 -m venv .venv && .venv/bin/pip install -r requirements_dev.txt
 pytest
+pypdf

@@ -1,116 +1,110 @@
 # lilybook_maker
 
-Lilybook maker will create a songbook PDF(s) from Lilypond and LaTeX.
-It was originally developed on Windows and also runs on Linux (tested with Ubuntu, TeX Live, LilyPond 2.24).
+Builds songbook PDFs from Lilypond scores and a LaTeX main file (`.lytex`, processed by lilypond-book).
 
-It is developed in bundle with https://github.com/hardmooth/lilybook_template - simply fork this to get your own songbook started.
+One checkout of lilybook_maker builds any number of books. The books contain only their sources
+(scores, texts, includes), all build logic lives here in `lilybook.mk`. A fix here is a `git pull`
+away for every book.
+
+Books built with it:
+* https://github.com/hardmooth/lilybook_template - the template to start your own book from
+* https://github.com/hardmooth/liederbuch_advent_weihnachten
+* https://github.com/hardmooth/Kommersbuch_KSG_Chemnitz
 
 # Usage
 
-## Setup/Prerequisites (Windows)
+Inside a book directory (next to the `.lytex` file):
 
-* install tools
-    * LaTeX - for Windows that's via https://miktex.org/download
-    * Lilypond - http://lilypond.org/download.de.html
-    * python (I am currently working with version 3.6) - https://www.python.org/downloads/
-    * git (either of the following)
-        * at least command line git: https://git-scm.com/download/win
-        * easier access via TortoiseGit: https://tortoisegit.org/download/
-* clone this repository / setup github connection
-  1. get a github account
-  1. request access to this repo
-  1. setup git credentials manager (for windows)
-    1. install https://github.com/microsoft/Git-Credential-Manager-Core
-    1. activate credentials manager as of https://git-scm.com/book/en/v2/Git-Tools-Credential-Storage
+    lilybook            # builds <book>.pdf (same as: lilybook pdf)
+    lilybook booklet    # additionally <book>-booklet.pdf: 2 pages per sheet in booklet order
+                        #   (A5 book -> A4 landscape; print duplex, flip on short edge, fold, staple)
+    lilybook scores     # a PDF next to every single score
+    lilybook check      # checks tools, LaTeX packages, file encodings and runs the book's check.py
+    lilybook full       # clean + pdf
+    lilybook clean      # removes out/ and the generated PDFs
+    lilybook help       # lists the targets and what was detected
 
-           git config --global credential.helper cache
+Builds are incremental: unchanged scores are not recompiled. Changes in included Lilypond files
+(`default.ly`, `LY-include.ly`, ...) discard the snippet cache automatically, since lilypond-book
+would not notice them. Output also goes to `lilybook.log` in the book directory.
 
-  1. git clone https://github.com/hardmooth/lilybook_maker.git (I suggest to clone it once and add
-  1. create initial configuration:
-  
-      python setup.py --init
+Options are make variables, e.g. `lilybook booklet STRICT=1`:
 
-* you can run a check whether the lilybook_maker finds everything (CMD inside the lilybook_maker):
+| variable   | default                                              | meaning                                         |
+|------------|------------------------------------------------------|-------------------------------------------------|
+| `LYTEX`    | the single `*.lytex` in the book directory           | main file                                       |
+| `INCLUDES` | every top level directory with `.ly` or `.tex` files | include directories for lilypond-book and LaTeX |
+| `OUT`      | `out`                                                | directory for snippets and LaTeX intermediates  |
+| `STRICT`   | unset                                                | `STRICT=1`: fail on LaTeX errors (default: keep going and list them) |
+| `BOOKLET_PAPER` | `a4paper`                                       | sheet size of the booklet                       |
 
-      python setup.py --check
+A book that needs different settings permanently puts them into an optional `book.mk`
+(e.g. `INCLUDES := scores texts inc`). Most books need none.
 
-* to store your credentials you can setup an SSH key (if you want to contribute or have future updates)
-  see https://docs.github.com/en/free-pro-team@latest/github/authenticating-to-github/connecting-to-github-with-ssh
-  if you're using TortoiseGit, also follow https://medium.com/chaya-thilakumara/tortoisegit-how-to-create-and-upload-your-public-key-to-github-884b7b619329
+If the sources use `\input{_gitshort}` (see the template's `inc/intro.tex`), the short git commit of
+the book is written to `_gitshort` before each build.
 
-## Setup/Prerequisites (Linux)
+# Setup
 
-* install tools (Debian/Ubuntu):
+## Linux (Debian/Ubuntu)
 
-      sudo apt install lilypond texlive-latex-base texlive-latex-recommended texlive-latex-extra \
-                       texlive-fonts-recommended texlive-fonts-extra texlive-lang-german python3-venv git
+    sudo apt install make lilypond latexmk texlive-latex-base texlive-latex-recommended \
+                     texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra texlive-lang-german
+    git clone https://github.com/hardmooth/lilybook_maker.git ~/lilybook_maker
+    echo 'export PATH="$PATH:$HOME/lilybook_maker"' >> ~/.bashrc
 
-  (`texlive-latex-extra`/`texlive-fonts-extra`/`texlive-lang-german` are needed by the packages used in
-  the lilybook_template preamble: koma-script, pdfpages, libertine, marvosym, framed, wrapfig, german, ...)
-* clone this repository and install the python requirements into a virtual environment
-  (`lilybook.sh` picks up `.venv` next to it automatically):
+`texlive-latex-base` plus `pdfpages` (in `texlive-latex-recommended`) is enough for a plain book;
+the template's preamble needs the other packages (koma-script, libertine, marvosym, framed, ...).
+`lilybook check` tells you what is missing.
 
-      git clone https://github.com/hardmooth/lilybook_maker.git
-      cd lilybook_maker
-      python3 -m venv .venv && .venv/bin/pip install -r requirements_py.txt
+## Windows
 
-  alternatively install them system wide (`python3 -m pip install -r requirements_py.txt`) or point
-  `LILYBOOK_PYTHON` to an interpreter that has them.
-* optionally add the lilybook_maker directory to your `PATH` (e.g. in `~/.bashrc`), so `lilybook.sh`
-  and the songbook's `build.sh` find it
-* check whether lilybook_maker finds everything:
+The build runs inside WSL (Windows Subsystem for Linux), which gives you the same toolchain as on
+Linux. Frescobaldi, editors and PDF viewers stay on the Windows side and work on the same files.
 
-      ./lilybook.sh --check
+1. `wsl --install` (Ubuntu), then inside WSL do the Linux setup above
+2. put the lilybook_maker checkout (the Windows clone, or `\\wsl$\Ubuntu\home\<you>\lilybook_maker`)
+   on the Windows `PATH`, so that `lilybook.cmd` is found
+3. inside a book directory run `lilybook`, `lilybook booklet`, ... from CMD or PowerShell.
+   `lilybook.cmd` forwards to `wsl bash -lc "lilybook ..."`; WSL maps the current directory itself.
 
-  `python setup.py --init` writes a `config.ini` (lilypond directory and pdflatex command). Without it,
-  the lilypond/pdflatex found in `PATH` are used, which is usually what you want on Linux.
+Keeping the books inside the WSL file system (`~/books/...`) makes lilypond noticeably faster than
+building on `/mnt/c/...`, but both work.
 
-Differences to Windows: on Linux `pdflatex` is run directly (TeX Live has no `texify`), so
-`create_pdf.py` reruns it until table of contents/references are stable and calls `makeindex` itself.
-Include directories are passed via `TEXINPUTS` instead of MiKTeX's `--include-directory`.
+# Starting a new book
 
-## creating a PDF
+Fork https://github.com/hardmooth/lilybook_template. Its layout is what `lilybook` expects:
 
-1. either of the following:
-    * run from CMD/bash (inside your book directory, next to <your_book_main_file.lytex>:
+    document.lytex       main file: title page, table of contents, chapters, \lilypondfile{...} per song
+    inc/                 LaTeX preamble, intro text, logo
+    scores/              one .ly per song, all including scores/default.ly for the common layout
+    check.py             optional book specific checks, run by `lilybook check` and before each build
 
-          python lilybook_maker/create_pdf.py <lytex_file_optional.lytex>
-         
-    * use the build.cmd inside the songbook (if derived from lilybook_template)
-1. during run accept latex updates (e.g. from MikTeX)
-1. you should now have a newly created PDF
+# Running the tests
 
-## options
+    python3 -m venv .venv && .venv/bin/pip install -r requirements_dev.txt
+    .venv/bin/python -m pytest
 
-    --include=scores,inc   include directories for lilypond-book and LaTeX (default: inc, scores, current dir)
-    --full                 delete the out/ directory before building
-    --booklet              additionally write <book>-booklet.pdf (2 pages per sheet in booklet order,
-                           e.g. A5 book -> A4 landscape sheets; print duplex, flip on short edge, fold, staple)
-    --strict               abort on the first error
-    --check                only check prerequisites
+`tests/test_lilybook.py` exercises every target and variable on the minimal book in
+`tests/data/minimal_book`. `tests/test_books.py` builds real books: by default
+`tests/data/template_book` (a snapshot of lilybook_template) and the sibling directories
+`../lilybook_template`, `../liederbuch_advent_weihnachten` and `../Kommersbuch_KSG_Chemnitz` of this
+checkout, if they exist. Other books can be given via `LILYBOOK_BOOKS` (directories separated by `:`):
 
-Booklets/2-on-1 can also be created separately with `pdf_transform.py --help`.
+    LILYBOOK_BOOKS=/path/to/my_book .venv/bin/python -m pytest tests/test_books.py
 
-## running the tests
+A book is skipped (with the reason shown by `-ra`) if its directory, the toolchain or one of its
+LaTeX packages is missing. The GitHub Actions workflow (`.github/workflows/tests.yml`) runs
+everything against the template snapshot on every push.
 
-    python -m pip install -r requirements_dev.txt   # or: .venv/bin/pip install -r requirements_dev.txt
-    python -m pytest
-
-The integration tests build the minimal example book in `tests/data/minimal_book` and are skipped
-if lilypond, lilypond-book or pdflatex are not installed.
-
-`tests/test_books.py` additionally builds real books with every command line option
-(see issue #4): by default `tests/data/template_book` (a snapshot of
-https://github.com/hardmooth/lilybook_template) and the sibling directories `../lilybook_template`
-and `../liederbuch_advent_weihnachten` of this checkout, if they exist. Other books can be given via
-the environment variable `LILYBOOK_BOOKS` (directories separated by `:`, on Windows `;`):
-
-    LILYBOOK_BOOKS=/path/to/my_book:/path/to/other_book python -m pytest tests/test_books.py
-
-A book is skipped (with the reason printed by `-ra`) if its directory or one of the LaTeX packages it
-uses is missing. The GitHub Actions workflow (`.github/workflows/tests.yml`) runs all of this against
-`tests/data/template_book` on every push (the template repository itself is not accessible from the
-runner). To refresh the snapshot from a lilybook_template checkout:
+To refresh the snapshot from a lilybook_template checkout:
 
     rm -rf tests/data/template_book && mkdir tests/data/template_book
     (cd ../lilybook_template && git ls-files -z) | (cd ../lilybook_template && xargs -0 -I{} cp --parents {} "$OLDPWD/tests/data/template_book/")
+
+# History
+
+Up to 2026 lilybook_maker was a Python tool (`create_pdf.py`) with its own LaTeX rerun loop,
+booklet generation via pypdf and Windows specific MiKTeX handling. It was replaced by this
+Makefile on top of latexmk and pdfpages; the Python version is available in the git history
+(branch `linux_compatibility`).

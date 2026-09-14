@@ -1,4 +1,0 @@
-# install via
-#   python -m pip install -r requirements_py.txt
-# (linux with externally managed python: python3 -m venv .venv && .venv/bin/pip install -r requirements_py.txt)
-pypdf

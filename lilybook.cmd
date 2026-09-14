@@ -1,19 +1,14 @@
-:: This script tries 
-:: 
-:: usage (either of the following)
-::   * 
-::  
-:: 
-:: Setup:
-::   1. clone this source folder
-::   2. add the older to PATH variable (User Path suffices)
-::      https://helpdeskgeek.com/windows-10/add-windows-path-environment-variable/
-::   3. if you want, create a shortcut of this CMD in your book folder
-
-
-:: simply run the python PDF builder (it will detect your LyTeX-File and build the book)
-:: forward all parameters given to this CMD to the python PDF builder: %*
-python %~dp0\create_pdf.py %*
-
-:: uncomment the following line to keep CMD open
-pause
+:: lilybook.cmd - runs lilybook inside WSL from a Windows CMD/Explorer.
+::
+:: usage (inside a book directory): lilybook [target ...]     e.g. lilybook booklet
+::
+:: Setup (once):
+::   1. install WSL with Ubuntu:            wsl --install
+::   2. inside WSL install the tools:       sudo apt install make lilypond latexmk texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra texlive-lang-german
+::   3. inside WSL clone lilybook_maker and add it to the PATH in ~/.bashrc:
+::        export PATH="$PATH:$HOME/lilybook_maker"
+::   4. put the directory containing this lilybook.cmd on the Windows PATH (User Path suffices)
+::
+:: WSL maps the current Windows directory automatically (c:\books\x -> /mnt/c/books/x).
+@echo off
+wsl bash -lc "lilybook %*"

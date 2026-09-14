@@ -1,4 +1,5 @@
 \version "2.24.0"
+\include "default.ly"
 \header {
   title = "Alle meine Entchen"
   tagline = ##f
@@ -21,5 +22,4 @@ text = \lyricmode {
     \new Voice = "mel" { \melody }
     \new Lyrics \lyricsto "mel" { \text }
   >>
-  \layout { }
 }
