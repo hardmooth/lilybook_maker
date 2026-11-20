@@ -19,6 +19,7 @@ Inside a book directory (next to the `.lytex` file):
     lilybook booklet    # additionally <book>-booklet.pdf: 2 pages per sheet in booklet order
                         #   (A5 book -> A4 landscape; print duplex, flip on short edge, fold, staple)
     lilybook scores     # a PDF next to every single score
+    lilybook scores/my_song.pdf    # a PDF for one score, built from scores/my_song.ly
     lilybook check      # checks tools, LaTeX packages, file encodings and runs the book's check.py
     lilybook full       # clean + pdf
     lilybook clean      # removes out/ and the generated PDFs
@@ -27,6 +28,9 @@ Inside a book directory (next to the `.lytex` file):
 Builds are incremental: unchanged scores are not recompiled. Changes in included Lilypond files
 (`default.ly`, `LY-include.ly`, ...) discard the snippet cache automatically, since lilypond-book
 would not notice them. Output also goes to `lilybook.log` in the book directory.
+
+A single score is built by lilypond alone, without LaTeX. An invalid `.ly` file makes the build
+fail: lilypond prints the error, the exit code is not 0 and no PDF is left behind.
 
 Options are make variables, e.g. `lilybook booklet STRICT=1`:
 
@@ -78,6 +82,7 @@ The container image holds the complete toolchain, so the host needs only podman 
 
     lilybook-container                # builds <book>.pdf
     lilybook-container booklet
+    lilybook-container scores/my_song.pdf    # one score
     lilybook-container --rebuild      # rebuilds the image first, e.g. after a git pull
 
 The first run builds the image `lilybook` from the `Containerfile`. The image installs TeX Live
@@ -110,6 +115,12 @@ Fork https://github.com/hardmooth/lilybook_template. Its layout is what `lilyboo
 checkout, if they exist. Other books can be given via `LILYBOOK_BOOKS` (directories separated by `:`):
 
     LILYBOOK_BOOKS=/path/to/my_book .venv/bin/python -m pytest tests/test_books.py
+
+`tests/test_container.py` exercises `lilybook-container` on the minimal book. These tests need podman
+or docker, but neither lilypond nor LaTeX on the host. They rebuild the image once per run.
+
+    .venv/bin/python -m pytest -m container           # only the container tests
+    .venv/bin/python -m pytest -m "not container"     # everything else
 
 A book is skipped (with the reason shown by `-ra`) if its directory, the toolchain or one of its
 LaTeX packages is missing. The GitHub Actions workflow (`.github/workflows/tests.yml`) runs

@@ -2,7 +2,11 @@
 ::
 :: usage (inside a book directory):
 ::   lilybook-container [target ...]              e.g. lilybook-container booklet
+::   lilybook-container scores/my_song.pdf        build one song from scores/my_song.ly
 ::   lilybook-container --rebuild [target ...]    rebuild the image first (after a git pull)
+::
+:: A single song is built by lilypond alone, as a PDF next to its .ly file. An invalid .ly file makes
+:: the build fail: lilypond prints the error, the exit code is not 0 and no PDF is left behind.
 ::
 :: Setup (once):
 ::   1. install Podman Desktop (or Docker Desktop) and start it
