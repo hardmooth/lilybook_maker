@@ -3,3 +3,5 @@
 lilybook text eol=lf
 *.mk   text eol=lf
 *.cmd  text eol=crlf
+lilybook-container text eol=lf
+Containerfile text eol=lf

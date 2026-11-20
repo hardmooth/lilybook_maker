@@ -71,6 +71,24 @@ Linux. Frescobaldi, editors and PDF viewers stay on the Windows side and work on
 Keeping the books inside the WSL file system (`~/books/...`) makes lilypond noticeably faster than
 building on `/mnt/c/...`, but both work.
 
+## Container (podman or docker)
+
+The container image holds the complete toolchain, so the host needs only podman or docker.
+`lilybook-container` takes the same targets and variables as `lilybook`:
+
+    lilybook-container                # builds <book>.pdf
+    lilybook-container booklet
+    lilybook-container --rebuild      # rebuilds the image first, e.g. after a git pull
+
+The first run builds the image `lilybook` from the `Containerfile`. The image installs TeX Live
+including `texlive-fonts-extra`, so that build downloads several gigabytes.
+
+The wrapper mounts the current directory as `/book` and runs `lilybook` there. The generated files
+belong to the calling user. `LILYBOOK_ENGINE=docker` selects docker when both engines are installed.
+
+On Windows, install Podman Desktop or Docker Desktop and put the lilybook_maker checkout on the
+`PATH`. `lilybook-container.cmd` then works from CMD or PowerShell inside a book directory.
+
 # Starting a new book
 
 Fork https://github.com/hardmooth/lilybook_template. Its layout is what `lilybook` expects:

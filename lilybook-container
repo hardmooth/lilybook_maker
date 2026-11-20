@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# lilybook-container - run lilybook inside a container, so the host needs only podman or docker.
+#
+# usage (inside a book directory):
+#   lilybook-container [target ...] [VARIABLE=value ...]     e.g.  lilybook-container booklet
+#   lilybook-container --rebuild [target ...]                rebuild the image first (after a git pull)
+#
+# Environment:
+#   LILYBOOK_ENGINE   podman or docker (default: podman if installed, otherwise docker)
+#   LILYBOOK_IMAGE    image name (default: lilybook)
+# The image is built from the Containerfile next to this script on the first run.
+
+set -euo pipefail
+
+MAKER_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+IMAGE="${LILYBOOK_IMAGE:-lilybook}"
+ENGINE="${LILYBOOK_ENGINE:-}"
+
+if [ -z "$ENGINE" ]; then
+    if command -v podman >/dev/null; then ENGINE=podman
+    elif command -v docker >/dev/null; then ENGINE=docker
+    else echo "lilybook-container: neither podman nor docker found" >&2; exit 2
+    fi
+fi
+
+rebuild=0
+if [ "${1:-}" = "--rebuild" ]; then rebuild=1; shift; fi
+
+if [ "$rebuild" = 1 ] || ! "$ENGINE" image inspect "$IMAGE" >/dev/null 2>&1; then
+    "$ENGINE" build -t "$IMAGE" -f "$MAKER_DIR/Containerfile" "$MAKER_DIR"
+fi
+
+# the files written into the book directory must belong to the calling user
+if [ "$ENGINE" = podman ]; then
+    user_args=(--userns=keep-id --security-opt label=disable)
+else
+    user_args=(--user "$(id -u):$(id -g)")
+fi
+
+exec "$ENGINE" run --rm "${user_args[@]}" -v "$PWD":/book "$IMAGE" "$@"
