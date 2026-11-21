@@ -166,4 +166,4 @@ To refresh the snapshot from a lilybook_template checkout:
 Up to 2026 lilybook_maker was a Python tool (`create_pdf.py`) with its own LaTeX rerun loop,
 booklet generation via pypdf and Windows specific MiKTeX handling. It was replaced by this
 Makefile on top of latexmk and pdfpages; the Python version is available in the git history
-(branch `linux_compatibility`).
+(up to commit `758f1e7`).
