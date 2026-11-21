@@ -3,6 +3,7 @@
 tests for lilybook / lilybook.mk on the minimal example book (tests/data/minimal_book)
 """
 import os
+import subprocess
 
 import pytest
 
@@ -278,7 +279,10 @@ def test_gitshort_is_written_only_if_the_sources_use_it( minimal_book):
     result = run_lilybook( minimal_book)
 
     assert_ok( result)
-    assert (minimal_book / "_gitshort").read_text().strip() == "unknown"
+    # the temporary book is no git repository itself, but pytest may place it inside one (--basetemp in CI)
+    git = subprocess.run( [ "git", "rev-parse", "--short", "HEAD"], cwd = str( minimal_book), capture_output = True, text = True)
+    expected = git.stdout.strip() if git.returncode == 0 else "unknown"
+    assert (minimal_book / "_gitshort").read_text().strip() == expected
 
 
 # ------------------------------------------------------------------------------------------------

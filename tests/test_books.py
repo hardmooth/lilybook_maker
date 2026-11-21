@@ -12,6 +12,7 @@ while, so the default build is done once per book (fixture `default_build`) and 
 """
 import glob
 import os
+import re
 
 import pytest
 
@@ -53,7 +54,8 @@ def test_default_build_writes_pdf_with_a_page_per_song( book, default_build):
 def test_default_build_replaces_lilypondfile_commands_with_snippets( book, default_build):
     tex = (book / "out" / (lytex_name( book) + ".tex")).read_text( encoding = "utf-8", errors = "replace")
 
-    assert "\\lilypondfile" not in tex
+    # a book may still mention \\lilypondfile in a comment
+    assert not re.search( r"^[^%\n]*\\lilypondfile", tex, re.MULTILINE)
     assert "lilypond" in tex.lower()
 
 
