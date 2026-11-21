@@ -77,6 +77,29 @@ def test_non_utf8_source_stops_the_build( minimal_book):
     assert not (minimal_book / (BOOK + ".pdf")).exists()
 
 
+def test_source_file_with_a_space_in_its_name_is_ignored_with_a_warning( minimal_book):
+    (minimal_book / "scores" / "alle_meine_entchen - Kopie.ly").write_text( "{ c' }\n")
+
+    result = run_lilybook( minimal_book, "pdf")
+
+    assert_ok( result)
+    assert 'ignoring files with a space in their name: "scores/alle_meine_entchen - Kopie.ly"' in result.stdout
+    assert (minimal_book / (BOOK + ".pdf")).exists()
+
+
+def test_stray_pdfs_next_to_the_scores_do_not_disturb_the_build( minimal_book):
+    # as left behind by an editor on Windows: a PDF of a single score and a copy with a space in its name
+    stale = minimal_book / "scores" / "alle_meine_entchen.pdf"
+    stale.write_bytes( b"not a pdf")
+    (minimal_book / "scores" / "alle_meine_entchen - Kopie.pdf").write_bytes( b"not a pdf")
+
+    result = run_lilybook( minimal_book, "pdf")
+
+    assert_ok( result)
+    assert "==       lilypond scores/" not in result.stdout
+    assert stale.read_bytes() == b"not a pdf"
+
+
 # ------------------------------------------------------------------------------------------------
 # the default build, done once and inspected by several tests
 

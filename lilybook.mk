@@ -48,7 +48,10 @@ endif
 endif
 
 # include directories: every top level directory with .ly or .tex files (but not the output directory)
-INCLUDES     ?= $(filter-out $(OUT),$(patsubst %/,%,$(sort $(dir $(wildcard */*.ly */*.tex)))))
+# make splits its lists at spaces, so files and directories with a space in their name are left out
+# everywhere below. `find` replaces $(wildcard ...), which would return such a name as two words.
+find_files    = $(shell find $(1) -maxdepth 1 \( $(2) \) ! -path '* *' 2>/dev/null | LC_ALL=C sort)
+INCLUDES     ?= $(filter-out $(OUT),$(sort $(shell find . -mindepth 2 -maxdepth 2 \( -name '*.ly' -o -name '*.tex' \) ! -path '* *' 2>/dev/null | cut -d/ -f2)))
 INCLUDE_DIRS := $(INCLUDES) .
 ABS_INCLUDES := $(abspath $(INCLUDE_DIRS))
 
@@ -57,10 +60,21 @@ space := $(empty) $(empty)
 # trailing separator keeps the default search path of the TeX distribution
 TEXINPUTS := $(subst $(space),:,$(ABS_INCLUDES)):
 
-TEX_SOURCES := $(LYTEX) $(foreach d,$(INCLUDE_DIRS),$(wildcard $(d)/*.tex))
-LY_ALL      := $(foreach d,$(INCLUDE_DIRS),$(wildcard $(d)/*.ly))
+TEX_SOURCES := $(LYTEX) $(foreach d,$(INCLUDE_DIRS),$(call find_files,$(d),-name '*.tex'))
+LY_ALL      := $(foreach d,$(INCLUDE_DIRS),$(call find_files,$(d),-name '*.ly'))
 SOURCES     := $(TEX_SOURCES) $(LY_ALL)
-GRAPHICS    := $(foreach d,$(INCLUDES),$(wildcard $(d)/*.pdf $(d)/*.png $(d)/*.jpg $(d)/*.eps))
+
+# A source file with a space in its name still builds if the book uses it, but make does not see it:
+# a change to it triggers no rebuild, and `scores` builds no PDF for it.
+SPACED := $(shell find $(INCLUDE_DIRS) -maxdepth 1 \( -name '*.ly' -o -name '*.tex' \) -name '* *' 2>/dev/null | sed 's|^\./||;s/.*/"&"/')
+ifneq ($(SPACED),)
+$(warning ignoring files with a space in their name: $(SPACED))
+endif
+
+# graphics that the LaTeX sources may include. PDFs of single scores (written by `lilybook scores` or an
+# editor like Frescobaldi) are left out: the book does not include them, and as prerequisites they would
+# be rebuilt before every book build.
+GRAPHICS    := $(filter-out $(LY_ALL:.ly=.pdf),$(foreach d,$(INCLUDES),$(call find_files,$(d),-name '*.pdf' -o -name '*.png' -o -name '*.jpg' -o -name '*.eps')))
 
 # scores referenced by \lilypondfile{...} in the main file ...
 SCORE_FILES := $(shell sed -n 's/.*\\lilypondfile\(\[[^]]*\]\)\?{\([^}]*\)}.*/\2/p' $(LYTEX) 2>/dev/null)
