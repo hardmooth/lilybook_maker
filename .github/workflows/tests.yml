@@ -32,7 +32,7 @@ jobs:
         run: python -m pip install -r requirements_dev.txt
 
       - name: lilybook check on the template snapshot
-        run: "$GITHUB_WORKSPACE/lilybook" check
+        run: '"$GITHUB_WORKSPACE/lilybook" check'
         working-directory: tests/data/template_book
 
       - name: Run tests
