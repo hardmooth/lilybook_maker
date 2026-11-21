@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # lilybook-container - run lilybook inside a container, so the host needs only podman or docker.
+# Podman or docker has to be set up once before the first build, see "Container" in README.md.
 #
 # usage (inside a book directory):
 #   lilybook-container [target ...] [VARIABLE=value ...]     e.g.  lilybook-container booklet
 #   lilybook-container scores/my_song.pdf                    build one song from scores/my_song.ly
 #   lilybook-container --rebuild [target ...]                rebuild the image first (after a git pull)
+#   lilybook-container --help                                list all targets, variables and options
 #
 # A single song is built by lilypond alone, as a PDF next to its .ly file. An invalid .ly file makes
 # the build fail: lilypond prints the error, the exit code is not 0 and no PDF is left behind.
@@ -25,6 +27,40 @@ if [ -z "$ENGINE" ]; then
     elif command -v docker >/dev/null; then ENGINE=docker
     else echo "lilybook-container: neither podman nor docker found" >&2; exit 2
     fi
+fi
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'USAGE'
+usage: lilybook-container [--rebuild] [target ...] [VARIABLE=value ...]
+
+Builds the book in the current directory inside a container (podman or docker).
+
+options:
+  --help, -h          show this help
+  --rebuild           rebuild the container image first, e.g. after a git pull
+
+targets:
+USAGE
+    sed -n 's/^\([a-z-]*\):.*## \(.*\)/  \1\t\2/p' "$MAKER_DIR/lilybook.mk" \
+        | sed 's/\$(BOOK)/<book>/g; s/\$(OUT)/out/g' | expand -t 22
+    cat <<'USAGE'
+  scores/<song>.pdf   build one score from scores/<song>.ly with lilypond alone
+
+variables:
+  STRICT=1            fail on LaTeX errors (default: keep going and list them)
+  LYTEX=<file>        main file (default: the single *.lytex in the directory)
+  INCLUDES="a b"      include directories (default: every directory with .ly or .tex files)
+  OUT=<dir>           directory for intermediate files (default: out)
+  BOOKLET_PAPER=<p>   sheet size of the booklet (default: a4paper)
+
+environment:
+  LILYBOOK_ENGINE     podman or docker (default: podman if installed, otherwise docker)
+  LILYBOOK_IMAGE      image name (default: lilybook)
+
+A book may define more targets in its own book.mk.
+"lilybook-container help" shows what lilybook detects in the current directory.
+USAGE
+    exit 0
 fi
 
 rebuild=0

@@ -85,6 +85,27 @@ def test_failing_target_gives_nonzero_exit_code( minimal_book):
     assert "no_such_target" in result.stdout
 
 
+def test_help_lists_every_target_of_the_makefile_without_an_engine( tmp_path):
+    result = subprocess.run( [ WRAPPER, "--help"], cwd = str( tmp_path),
+                             stdout = subprocess.PIPE, stderr = subprocess.STDOUT, text = True)
+
+    assert result.returncode == 0, result.stdout
+    for target in ( "pdf", "booklet", "scores", "full", "clean", "check", "scores/<song>.pdf", "--rebuild", "STRICT=1"):
+        assert "  " + target + " " in result.stdout, target
+    assert not (tmp_path / "lilybook.log").exists()
+
+
+def test_cmd_help_lists_the_same_targets_as_the_makefile():
+    # lilybook-container.cmd cannot read lilybook.mk, so its target list is written out by hand
+    import re
+    with open( os.path.join( MAKER_DIR, "lilybook.mk")) as makefile:
+        targets = re.findall( r"^([a-z-]+):.*## ", makefile.read(), re.MULTILINE)
+    with open( WRAPPER + ".cmd", newline = "") as cmd:
+        listed = re.findall( r"^echo   ([a-z-]+)  ", cmd.read().split( "echo targets:")[1].split( "echo variables:")[0], re.MULTILINE)
+
+    assert listed == targets
+
+
 def test_missing_engine_is_reported( tmp_path):
     # a PATH with the tools the wrapper itself needs, but without podman and docker
     bin_dir = tmp_path / "bin"

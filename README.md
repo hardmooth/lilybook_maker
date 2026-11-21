@@ -77,22 +77,52 @@ building on `/mnt/c/...`, but both work.
 
 ## Container (podman or docker)
 
-The container image holds the complete toolchain, so the host needs only podman or docker.
-`lilybook-container` takes the same targets and variables as `lilybook`:
+The container image holds the complete toolchain. The host needs neither lilypond nor LaTeX nor
+make. It needs podman or docker, which you have to set up once, before the first build.
+
+### Set up podman or docker (once)
+
+Linux (Debian/Ubuntu):
+
+    sudo apt install podman
+
+Windows:
+
+1. Enable hardware virtualization in the BIOS/UEFI (Intel VT-x or AMD-V), if it is off.
+2. Install WSL 2. Run `wsl --install` in an administrator CMD and reboot.
+3. Install Podman (https://podman.io) or Podman Desktop. When the installer asks for the
+   virtualization provider, choose **WSL**. Hyper-V needs Windows Pro or Enterprise and
+   administrator rights. kubectl and Compose are not needed.
+4. Create and start the Podman machine. Podman Desktop offers this on its first start. On the
+   command line it is `podman machine init`, then `podman machine start`.
+5. Put the lilybook_maker checkout on the Windows `PATH`, so that `lilybook-container.cmd` is found.
+
+Docker Desktop works instead of podman. Set `LILYBOOK_ENGINE=docker` in that case.
+
+On both systems, check the engine before the first build:
+
+    podman run --rm docker.io/library/hello-world
+
+It must print a greeting. On Windows the Podman machine has to be running for every build. After a
+reboot start it again with `podman machine start` or through Podman Desktop. A stopped machine
+shows as the error `Cannot connect to Podman`.
+
+### Build a book
+
+`lilybook-container` takes the same targets and variables as `lilybook`. Run it inside a book
+directory, on Windows from CMD or PowerShell:
 
     lilybook-container                # builds <book>.pdf
     lilybook-container booklet
     lilybook-container scores/my_song.pdf    # one score
     lilybook-container --rebuild      # rebuilds the image first, e.g. after a git pull
+    lilybook-container --help         # lists all targets, variables and options
 
 The first run builds the image `lilybook` from the `Containerfile`. The image installs TeX Live
 including `texlive-fonts-extra`, so that build downloads several gigabytes.
 
-The wrapper mounts the current directory as `/book` and runs `lilybook` there. The generated files
-belong to the calling user. `LILYBOOK_ENGINE=docker` selects docker when both engines are installed.
-
-On Windows, install Podman Desktop or Docker Desktop and put the lilybook_maker checkout on the
-`PATH`. `lilybook-container.cmd` then works from CMD or PowerShell inside a book directory.
+The wrapper mounts the current directory as `/book` and runs `lilybook` there. On Linux the
+generated files belong to the calling user.
 
 # Starting a new book
 
