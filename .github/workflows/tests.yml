@@ -4,6 +4,12 @@ on:
   push:
   pull_request:
 
+# An explicit shell makes GitHub run bash with "-o pipefail". Without it, "pytest | tee" would report
+# the exit code of tee, and failing tests would leave the job green.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   linux:
     name: Linux
