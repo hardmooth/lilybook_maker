@@ -9,7 +9,7 @@ FROM docker.io/library/ubuntu:24.04
 
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      make lilypond latexmk poppler-utils git python3 \
+      make lilypond latexmk poppler-utils git python3 fonts-freefont-ttf \
       texlive-latex-base texlive-latex-recommended texlive-latex-extra \
       texlive-fonts-recommended texlive-fonts-extra texlive-lang-german \
  && rm -rf /var/lib/apt/lists/* \
