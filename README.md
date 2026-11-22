@@ -52,7 +52,7 @@ the book is written to `_gitshort` before each build.
 
 ## Linux (Debian/Ubuntu)
 
-    sudo apt install make lilypond latexmk texlive-latex-base texlive-latex-recommended \
+    sudo apt install make lilypond latexmk fonts-freefont-ttf texlive-latex-base texlive-latex-recommended \
                      texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra texlive-lang-german
     git clone https://github.com/hardmooth/lilybook_maker.git ~/lilybook_maker
     echo 'export PATH="$PATH:$HOME/lilybook_maker"' >> ~/.bashrc

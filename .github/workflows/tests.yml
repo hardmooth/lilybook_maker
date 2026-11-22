@@ -24,7 +24,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            make lilypond latexmk poppler-utils \
+            make lilypond latexmk poppler-utils fonts-freefont-ttf \
             texlive-latex-base texlive-latex-recommended texlive-latex-extra \
             texlive-fonts-recommended texlive-fonts-extra texlive-lang-german
 
