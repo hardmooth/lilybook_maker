@@ -59,6 +59,10 @@ def test_default_build_replaces_lilypondfile_commands_with_snippets( book, defau
     assert "lilypond" in tex.lower()
 
 
+def test_default_build_detects_textwidth( book, default_build):
+    assert "cannot detect textwidth" not in default_build.stdout, default_build.stdout
+
+
 def test_rebuild_without_changes_does_nothing( book, default_build):
     result = run_lilybook( book)
 
