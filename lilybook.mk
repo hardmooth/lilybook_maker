@@ -160,9 +160,14 @@ $(OUT)/.ly-includes.stamp: $(LY_INCLUDED) | $(OUT)
 	@if ls $(OUT)/[0-9a-f][0-9a-f] >/dev/null 2>&1; then echo "==       included .ly files changed - discarding cached snippets"; rm -rf $(OUT)/[0-9a-f][0-9a-f]; fi
 	@touch $@
 
+# lilypond-book runs LaTeX on the preamble to detect the text width. It searches only the directory
+# of the .lytex file, so a preamble \input from an include directory needs TEXINPUTS. That LaTeX run
+# writes into the current directory and removes only its .aux and .log, hence its own output directory.
 $(OUT)/$(BOOK).tex: $(SOURCES) $(OUT)/.ly-includes.stamp | check-encoding check-book gitshort
 	@echo "==       lilypond-book $(LYTEX)"
-	$(LILYPOND_BOOK) --pdf $(addprefix --include=,$(ABS_INCLUDES)) --output=$(OUT) $(LILYPOND_BOOK_FLAGS) $(LYTEX)
+	@rm -rf $(OUT)/textwidth && mkdir $(OUT)/textwidth
+	TEXINPUTS="$(TEXINPUTS)" $(LILYPOND_BOOK) --pdf --latex-program='$(PDFLATEX) -draftmode -output-directory="$(abspath $(OUT))/textwidth"' $(addprefix --include=,$(ABS_INCLUDES)) --output=$(OUT) $(LILYPOND_BOOK_FLAGS) $(LYTEX)
+	@rm -rf $(OUT)/textwidth
 	@test -f $@ || { echo "lilypond-book did not write $@" >&2; exit 1; }
 	@touch $@
 
