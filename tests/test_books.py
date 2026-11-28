@@ -61,6 +61,8 @@ def test_default_build_replaces_lilypondfile_commands_with_snippets( book, defau
 
 def test_default_build_detects_textwidth( book, default_build):
     assert "cannot detect textwidth" not in default_build.stdout, default_build.stdout
+    # the LaTeX run of that detection writes tmp*.pdf and the like into the current directory
+    assert not glob.glob( str( book / "tmp*")), "leftovers of the textwidth detection"
 
 
 def test_rebuild_without_changes_does_nothing( book, default_build):
